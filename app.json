@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "my-book-app",
-    "slug": "my-book-app",
+    "slug": "mybookapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "dev.danniel.mybookapp"
     },
     "web": {
       "output": "static",
@@ -27,6 +32,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite a Mi Libro App acceder a la cámara para escanear códigos de barras ISBN."
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -38,11 +49,19 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d6bd11bd-bc60-45ce-88f5-d9645a66afc7"
+      }
+    },
+    "owner": "dannieldev"
   }
 }
