@@ -18,29 +18,29 @@ export type AppColorsPalette = {
 };
 
 const light: AppColorsPalette = {
-  primary: '#2D5A27',
-  primaryDark: '#1E3D1A',
-  background: '#F8F6F3',
-  surface: '#FFFFFF',
-  text: '#1A1A1A',
-  textSecondary: '#5C5C5C',
-  border: '#E0E0E0',
-  error: '#C62828',
-  success: '#2E7D32',
-  warning: '#F9A825',
+  primary: "#3B4F8C", // Índigo profundo — moderno, confiable
+  primaryDark: "#273666", // Índigo oscuro
+  background: "#F4F3F8", // Blanco lavanda suave — no tan frío como blanco puro
+  surface: "#FFFFFF",
+  text: "#12131A", // Casi negro con tinte azulado
+  textSecondary: "#5A5D72", // Slate medio
+  border: "#DDE0EF", // Lavanda muy suave
+  error: "#C0392B",
+  success: "#1A7A5E", // Verde esmeralda apagado
+  warning: "#D4880A", // Ámbar cálido
 };
 
 const dark: AppColorsPalette = {
-  primary: '#4A9C3E',
-  primaryDark: '#2D5A27',
-  background: '#1A1A1A',
-  surface: '#2D2D2D',
-  text: '#F0F0F0',
-  textSecondary: '#A0A0A0',
-  border: '#404040',
-  error: '#EF5350',
-  success: '#66BB6A',
-  warning: '#FFB74D',
+  primary: "#6B84D4", // Índigo claro — vibra bien sobre oscuro
+  primaryDark: "#3B4F8C",
+  background: "#0F1117", // Casi negro azulado — más rico que gris neutro
+  surface: "#1C1F2E", // Superficie con tinte índigo
+  text: "#EEF0FA", // Blanco con leve tinte lavanda
+  textSecondary: "#8B90AC", // Slate claro
+  border: "#2E3348", // Borde índigo oscuro
+  error: "#E05C5C",
+  success: "#4DB896", // Verde menta vibrante
+  warning: "#F0AD3E", // Ámbar dorado
 };
 
 /** Colores en modo claro (compatibilidad). */

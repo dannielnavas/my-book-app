@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
@@ -19,7 +20,7 @@ import type { AppColorsPalette } from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
-import { createBook } from "@/lib/books-api";
+import { createBook, uploadBookCover } from "@/lib/books-api";
 import type { EstadoLectura, ResultadoBusqueda } from "@/types/api";
 
 const ESTADOS: EstadoLectura[] = ["pendiente", "en_lectura", "leido"];
@@ -45,6 +46,7 @@ export default function AddBookScreen() {
   const [estadoLectura, setEstadoLectura] =
     useState<EstadoLectura>("pendiente");
   const [loading, setLoading] = useState(false);
+  const [coverLocalUri, setCoverLocalUri] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -58,6 +60,7 @@ export default function AddBookScreen() {
         setPaginasTotales(p.totalPages != null ? String(p.totalPages) : "");
         setDescripcion(p.description ?? "");
         setImagenUrl(p.imageUrl ?? "");
+        setCoverLocalUri(null);
       } catch {
         // ignore
       }
@@ -65,6 +68,40 @@ export default function AddBookScreen() {
       setIsbn(params.isbn);
     }
   }, [params.prefill, params.isbn]);
+
+  const handleTakeCoverPhoto = async () => {
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "No disponible",
+        "Tomar foto de la portada solo está disponible en dispositivos móviles.",
+      );
+      return;
+    }
+
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permiso requerido",
+        "Necesitamos acceso a la cámara para tomar la foto de la portada.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+
+    setCoverLocalUri(asset.uri);
+    // Si se toma una foto, damos prioridad a esa portada en lugar de la URL manual.
+    setImagenUrl("");
+  };
 
   const handleCreate = async () => {
     const titleTrim = titulo.trim();
@@ -75,16 +112,34 @@ export default function AddBookScreen() {
     if (!token) return;
     setLoading(true);
     try {
-      await createBook(token, {
+      const manualImageUrl = imagenUrl.trim() || undefined;
+      const created = await createBook(token, {
         title: titleTrim,
         author: autor.trim() || undefined,
         isbn: isbn.trim() || undefined,
         genre: genero.trim() || undefined,
         totalPages: paginasTotales ? parseInt(paginasTotales, 10) : undefined,
         description: descripcion.trim() || undefined,
-        imageUrl: imagenUrl.trim() || undefined,
+        // Si hay una foto local pendiente, la subiremos con el endpoint de portada.
+        imageUrl: coverLocalUri ? undefined : manualImageUrl,
         isOwned: true,
       });
+      if (coverLocalUri) {
+        try {
+          const res = await uploadBookCover(
+            token,
+            created.libroId,
+            coverLocalUri,
+          );
+          setImagenUrl(res.imageUrl);
+        } catch (e) {
+          const msg =
+            e instanceof ApiError
+              ? e.message
+              : "Libro creado pero hubo un problema al subir la portada.";
+          Alert.alert("Aviso", msg);
+        }
+      }
       Alert.alert("Listo", "Libro añadido a tu biblioteca", [
         { text: "OK", onPress: () => router.replace("/(tabs)") },
       ]);
@@ -115,12 +170,12 @@ export default function AddBookScreen() {
         </View>
 
         {/* Portada (preview) */}
-        {(imagenUrl.trim() || titulo.trim()) && (
+        {(coverLocalUri || imagenUrl.trim() || titulo.trim()) && (
           <View style={styles.previewCard}>
             <View style={styles.previewCoverWrap}>
-              {imagenUrl.trim() ? (
+              {coverLocalUri || imagenUrl.trim() ? (
                 <Image
-                  source={{ uri: imagenUrl.trim() }}
+                  source={{ uri: coverLocalUri || imagenUrl.trim() }}
                   style={styles.previewCover}
                   resizeMode="cover"
                 />
@@ -240,7 +295,32 @@ export default function AddBookScreen() {
             numberOfLines={3}
             editable={!loading}
           />
-          <Text style={styles.label}>URL de la portada</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 4,
+            }}
+          >
+            <Text style={styles.label}>Portada</Text>
+            <TouchableOpacity
+              onPress={handleTakeCoverPhoto}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={{
+                  color: colors.primary,
+                  fontWeight: "600",
+                  fontSize: 13,
+                }}
+              >
+                Tomar foto
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.label}>URL de la portada (opcional)</Text>
           <TextInput
             style={styles.input}
             value={imagenUrl}

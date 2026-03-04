@@ -1,23 +1,25 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import type { AppColorsPalette } from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
-import { getBook, updateBook } from "@/lib/books-api";
+import { getBook, updateBook, uploadBookCover } from "@/lib/books-api";
 import type { EstadoLectura, Libro } from "@/types/api";
 
 const ESTADOS: EstadoLectura[] = ["pendiente", "en_lectura", "leido"];
@@ -42,6 +44,8 @@ export default function EditBookScreen() {
     useState<EstadoLectura>("pendiente");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [coverLocalUri, setCoverLocalUri] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const load = useCallback(async () => {
     if (!token || isNaN(libroId)) return;
@@ -59,6 +63,7 @@ export default function EditBookScreen() {
       setDescripcion(b.descripcion ?? "");
       setImagenUrl(b.imagenUrl ?? "");
       setEstadoLectura(b.estadoLectura);
+      setCoverLocalUri(null);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al cargar";
       Alert.alert("Error", msg, [{ text: "OK", onPress: () => router.back() }]);
@@ -70,6 +75,53 @@ export default function EditBookScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleTakeCoverPhoto = async () => {
+    if (!token || !book) return;
+
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "No disponible",
+        "Tomar foto de la portada solo está disponible en dispositivos móviles.",
+      );
+      return;
+    }
+
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permiso requerido",
+        "Necesitamos acceso a la cámara para tomar la foto de la portada.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+
+    setCoverLocalUri(asset.uri);
+    setUploadingCover(true);
+    try {
+      const res = await uploadBookCover(token, book.libroId, asset.uri);
+      setImagenUrl(res.imageUrl);
+      if (res.book) setBook(res.book);
+      Alert.alert("Portada actualizada", "La nueva portada se ha guardado.");
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : "Error al subir la portada";
+      Alert.alert("Error", msg);
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   const handleSave = async () => {
     const titleTrim = titulo.trim();
@@ -119,6 +171,20 @@ export default function EditBookScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
+        {(coverLocalUri || imagenUrl.trim()) && (
+          <View style={{ alignItems: "center", marginBottom: 16 }}>
+            <Image
+              source={{ uri: coverLocalUri || imagenUrl.trim() }}
+              style={{
+                width: 96,
+                height: 144,
+                borderRadius: 10,
+                backgroundColor: colors.border,
+              }}
+              resizeMode="cover"
+            />
+          </View>
+        )}
         <Text style={styles.label}>Título *</Text>
         <TextInput
           style={styles.input}
@@ -213,7 +279,25 @@ export default function EditBookScreen() {
           numberOfLines={3}
           editable={!saving}
         />
-        <Text style={styles.label}>URL de portada</Text>
+        <View style={styles.portadaHeaderRow}>
+          <Text style={styles.label}>Portada</Text>
+          <TouchableOpacity
+            onPress={handleTakeCoverPhoto}
+            disabled={saving || uploadingCover}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={{
+                color: colors.primary,
+                fontWeight: "600",
+                fontSize: 13,
+              }}
+            >
+              {uploadingCover ? "Subiendo..." : "Tomar foto"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.label}>URL de portada (opcional)</Text>
         <TextInput
           style={styles.input}
           value={imagenUrl}
@@ -313,6 +397,12 @@ function createStyles(colors: AppColorsPalette) {
       color: "#fff",
       fontSize: 17,
       fontWeight: "600",
+    },
+    portadaHeaderRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 4,
     },
   });
 }

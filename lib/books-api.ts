@@ -1,11 +1,12 @@
 import type {
-    ActualizarPaginasDto,
-    CreateBookDto,
-    Libro,
-    ResultadoBusqueda,
-    UpdateBookDto,
+  ActualizarPaginasDto,
+  CreateBookDto,
+  Libro,
+  ResultadoBusqueda,
+  UpdateBookDto,
 } from "@/types/api";
 import { api, ApiError } from "./api";
+import { env } from "./env";
 
 /** Normaliza un libro devuelto por la API (puede venir en español o camelCase) */
 function normalizeLibro(raw: Record<string, unknown>): Libro {
@@ -75,6 +76,12 @@ function normalizeLibro(raw: Record<string, unknown>): Libro {
     updatedAt: String(raw.updatedAt ?? ""),
     usuarioId: Number(raw.usuarioId ?? raw.userId ?? 0),
   };
+}
+
+function buildApiUrl(path: string): string {
+  const base = env.API_URL.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
 }
 
 export async function searchBooks(
@@ -162,6 +169,79 @@ export async function deleteBook(
   libroId: number,
 ): Promise<void> {
   await api(`/books/${libroId}`, { method: "DELETE", token });
+}
+
+interface UploadCoverRawResponse {
+  imageUrl?: string;
+  imagenUrl?: string;
+  book?: Record<string, unknown>;
+  data?: {
+    imageUrl?: string;
+    imagenUrl?: string;
+    book?: Record<string, unknown>;
+  };
+}
+
+export async function uploadBookCover(
+  token: string,
+  libroId: number,
+  fileUri: string,
+  fileName?: string,
+  mimeType?: string,
+): Promise<{ imageUrl: string; book: Libro | null }> {
+  const url = buildApiUrl(`/books/${libroId}/cover`);
+
+  const form = new FormData();
+  form.append("file", {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    uri: fileUri,
+    name: fileName ?? `cover-${libroId}.jpg`,
+    type: mimeType ?? "image/jpeg",
+  } as any);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    let message = res.statusText || `Error ${res.status}`;
+    try {
+      const data = (await res.json()) as { message?: unknown; error?: unknown };
+      if (data.message)
+        message = Array.isArray(data.message)
+          ? data.message.join(", ")
+          : String(data.message);
+      else if (data.error) message = String(data.error);
+    } catch {
+      // ignore
+    }
+    if (!message || String(message).trim() === "") {
+      message =
+        res.status === 404
+          ? "No encontrado"
+          : `Error del servidor (${res.status})`;
+    }
+    throw new ApiError(res.status, message);
+  }
+
+  const data = (await res.json()) as UploadCoverRawResponse;
+  const rawImageUrl =
+    data.imageUrl ??
+    data.imagenUrl ??
+    data.data?.imageUrl ??
+    data.data?.imagenUrl;
+  const rawBook = data.book ?? data.data?.book ?? null;
+
+  if (!rawImageUrl) {
+    throw new ApiError(500, "Respuesta inválida al subir la portada");
+  }
+
+  const book = rawBook ? normalizeLibro(rawBook) : null;
+  return { imageUrl: rawImageUrl, book };
 }
 
 export { ApiError };
