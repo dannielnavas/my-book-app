@@ -1,7 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -14,6 +20,7 @@ import Animated, {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 
@@ -22,6 +29,8 @@ export default function UnlockScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { unlockWithBiometric, logout } = useAuth();
+  const { alert: appAlert } = useAppDialog();
+  const [unlocking, setUnlocking] = useState(false);
 
   const iconScale = useSharedValue(1);
 
@@ -41,23 +50,34 @@ export default function UnlockScreen() {
   }));
 
   const handleUnlock = () => {
-    Alert.alert(
-      "Inicio con biometría",
-      "Vas a iniciar sesión con Face ID o Touch ID para acceder a tu cuenta.",
+    appAlert(
+      "Desbloquear Mi Libro",
+      "Usa la huella o el rostro guardados en tu dispositivo para seguir leyendo.",
       [
         { text: "Cancelar", style: "cancel" },
         {
           text: "Continuar",
           onPress: async () => {
+            setUnlocking(true);
             try {
               await unlockWithBiometric();
               router.replace("/(tabs)");
             } catch {
-              Alert.alert("Error", "No se pudo verificar la biometría");
+              setTimeout(() => {
+                appAlert(
+                  "No pudimos verificar tu identidad",
+                  "Inténtalo otra vez o cierra sesión e inicia con tu contraseña.",
+                  undefined,
+                  { tone: "error" },
+                );
+              }, 350);
+            } finally {
+              setUnlocking(false);
             }
           },
         },
-      ]
+      ],
+      { tone: "info" },
     );
   };
 
@@ -68,6 +88,12 @@ export default function UnlockScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      {unlocking ? (
+        <View style={styles.busyOverlay} pointerEvents="auto">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.busyText}>Verificando biometría…</Text>
+        </View>
+      ) : null}
       <View style={styles.topSection}>
         <Animated.View entering={FadeInDown.duration(600).springify()}>
           <View style={styles.logoContainer}>
@@ -89,6 +115,7 @@ export default function UnlockScreen() {
             style={styles.biometricButton}
             onPress={handleUnlock}
             activeOpacity={0.8}
+            disabled={unlocking}
           >
             <Animated.View style={[styles.iconWrapper, animatedIconStyle]}>
               <View style={styles.iconContainer}>
@@ -103,7 +130,11 @@ export default function UnlockScreen() {
         style={styles.footer}
         entering={FadeInUp.duration(600).delay(600).springify()}
       >
-        <TouchableOpacity style={styles.outlineButton} onPress={handleLogout}>
+        <TouchableOpacity
+          style={styles.outlineButton}
+          onPress={handleLogout}
+          disabled={unlocking}
+        >
           <Text style={styles.outlineButtonText}>Inicia sesión con otra cuenta</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -116,6 +147,19 @@ function createStyles(colors: AppColorsPalette) {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    busyOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(15, 17, 23, 0.4)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 40,
+      gap: 12,
+    },
+    busyText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
     },
     topSection: {
       paddingTop: 40,

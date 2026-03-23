@@ -3,7 +3,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Image,
     KeyboardAvoidingView,
     Platform,
@@ -17,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
@@ -36,6 +36,7 @@ export default function AddBookScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { token, user } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const { isPaid } = getEntitlements(user);
   const params = useLocalSearchParams<{ prefill?: string; isbn?: string }>();
   const [titulo, setTitulo] = useState("");
@@ -73,27 +74,32 @@ export default function AddBookScreen() {
 
   const handleTakeCoverPhoto = async () => {
     if (!isPaid) {
-      Alert.alert(
-        "Función Premium",
-        "Tomar foto de la portada es exclusivo para usuarios Premium o De por vida. Actualiza tu plan para usarla.",
-        [{ text: "Entendido" }],
+      appAlert(
+        "Foto de portada — Premium",
+        "Subir la portada con la cámara está incluido en planes Premium o De por vida. Actualiza cuando quieras.",
+        undefined,
+        { tone: "info" },
       );
       return;
     }
 
     if (Platform.OS === "web") {
-      Alert.alert(
-        "No disponible",
-        "Tomar foto de la portada solo está disponible en dispositivos móviles.",
+      appAlert(
+        "Solo en el móvil",
+        "La cámara para la portada está disponible en la app en iPhone y Android, no en la versión web.",
+        undefined,
+        { tone: "info" },
       );
       return;
     }
 
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
-        "Permiso requerido",
-        "Necesitamos acceso a la cámara para tomar la foto de la portada.",
+      appAlert(
+        "Permiso de cámara",
+        "Activa el acceso a la cámara en ajustes del sistema para fotografiar la portada.",
+        undefined,
+        { tone: "warning" },
       );
       return;
     }
@@ -117,7 +123,12 @@ export default function AddBookScreen() {
   const handleCreate = async () => {
     const titleTrim = titulo.trim();
     if (!titleTrim) {
-      Alert.alert("Error", "El título es obligatorio");
+      appAlert(
+        "Falta el título",
+        "Pon al menos un título para identificar el libro en tu biblioteca.",
+        undefined,
+        { tone: "warning" },
+      );
       return;
     }
     if (!token) return;
@@ -148,15 +159,28 @@ export default function AddBookScreen() {
             e instanceof ApiError
               ? e.message
               : "Libro creado pero hubo un problema al subir la portada.";
-          Alert.alert("Aviso", msg);
+          appAlert(
+            "Libro creado, portada pendiente",
+            msg,
+            undefined,
+            { tone: "warning" },
+          );
         }
       }
-      Alert.alert("Listo", "Libro añadido a tu biblioteca", [
-        { text: "OK", onPress: () => router.replace("/(tabs)") },
-      ]);
+      appAlert(
+        "¡Ya está en tu biblioteca!",
+        "Puedes seguir añadiendo libros o volver al inicio.",
+        [{ text: "Ir a la biblioteca", onPress: () => router.replace("/(tabs)") }],
+        { tone: "success" },
+      );
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al crear el libro";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos añadir el libro",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
     }

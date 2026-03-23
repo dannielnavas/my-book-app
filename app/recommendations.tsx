@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -15,6 +14,7 @@ import {
 } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { createRecommendation } from "@/lib/ai-api";
@@ -30,6 +30,7 @@ export default function RecommendationsScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { token } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
@@ -48,11 +49,21 @@ export default function RecommendationsScreen() {
         },
         aiModel: "gpt-4",
       });
-      Alert.alert("Guardado", "Recomendación registrada en el historial.");
+      appAlert(
+        "Guardado en tu historial",
+        "La próxima vez podrás revisar esta recomendación desde la app.",
+        undefined,
+        { tone: "success" },
+      );
       setPrompt("");
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al guardar";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos guardar la recomendación",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
     }

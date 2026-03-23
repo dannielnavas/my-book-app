@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -19,6 +18,7 @@ import {
 } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { AuthApiError, useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 
@@ -27,6 +27,7 @@ export default function RegisterScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { register } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,11 +35,21 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!nombre.trim() || !email.trim() || !password) {
-      Alert.alert("Error", "Completa nombre, email y contraseña");
+      appAlert(
+        "Completa el formulario",
+        "Necesitamos tu nombre, correo y una contraseña para crear tu cuenta.",
+        undefined,
+        { tone: "warning" },
+      );
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
+      appAlert(
+        "Contraseña demasiado corta",
+        "Usa al menos 6 caracteres para proteger tu biblioteca.",
+        undefined,
+        { tone: "warning" },
+      );
       return;
     }
     setLoading(true);
@@ -48,7 +59,12 @@ export default function RegisterScreen() {
     } catch (e) {
       const msg =
         e instanceof AuthApiError ? e.message : "Error al registrarse";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos crear tu cuenta",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
     }

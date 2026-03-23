@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   Dimensions,
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
@@ -37,6 +38,7 @@ export default function ScanScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { token } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
@@ -45,14 +47,15 @@ export default function ScanScreen() {
       if (scanned || !token) return;
       const isbn = normalizeIsbn(data);
       if (!isValidIsbn(isbn)) {
-        Alert.alert(
-          'Código no válido',
-          'El código escaneado no parece un ISBN (10 o 13 dígitos). ¿Buscar por texto o añadir manualmente?',
+        appAlert(
+          "Este código no es un ISBN",
+          "Necesitamos un ISBN de 10 o 13 dígitos. Puedes buscar el libro por nombre o añadirlo a mano.",
           [
-            { text: 'Buscar por nombre', onPress: () => router.replace('/search') },
-            { text: 'Añadir manualmente', onPress: () => router.replace({ pathname: '/add-book', params: {} }) },
-            { text: 'Reintentar', onPress: () => setScanned(false) },
-          ]
+            { text: "Buscar por nombre", onPress: () => router.replace("/search") },
+            { text: "Añadir a mano", onPress: () => router.replace({ pathname: "/add-book", params: {} }) },
+            { text: "Escanear otra vez", onPress: () => setScanned(false) },
+          ],
+          { tone: "warning" },
         );
         return;
       }
@@ -65,28 +68,34 @@ export default function ScanScreen() {
             params: { prefill: JSON.stringify(results[0]) },
           });
         } else {
-          Alert.alert(
-            'Sin resultados por ISBN',
-            'No encontramos libros con ese ISBN. ¿Buscar por nombre o añadir manualmente?',
+          appAlert(
+            "No hay datos para ese ISBN",
+            "Prueba a buscar por título o autor, o crea la ficha del libro tú mismo.",
             [
-              { text: 'Buscar por nombre', onPress: () => router.replace('/search') },
+              { text: "Buscar por nombre", onPress: () => router.replace("/search") },
               {
-                text: 'Añadir manualmente',
+                text: "Añadir con este ISBN",
                 onPress: () =>
                   router.replace({
-                    pathname: '/add-book',
+                    pathname: "/add-book",
                     params: { isbn },
                   }),
               },
-            ]
+            ],
+            { tone: "info" },
           );
         }
       } catch (e) {
         const msg = e instanceof ApiError ? e.message : 'Error al buscar';
-        Alert.alert('Error', msg, [{ text: 'OK', onPress: () => setScanned(false) }]);
+        appAlert(
+          "No pudimos buscar el libro",
+          msg,
+          [{ text: "Reintentar", onPress: () => setScanned(false) }],
+          { tone: "error" },
+        );
       }
     },
-    [scanned, token, router]
+    [scanned, token, router, appAlert]
   );
 
   if (!permission) {
@@ -161,16 +170,24 @@ export default function ScanScreen() {
 
       <View style={styles.footer} pointerEvents="box-none">
         <View style={styles.footerCard}>
-          <Text style={styles.footerIcon}>{scanned ? "⏳" : "📖"}</Text>
           {scanned ? (
-            <View>
-              <Text style={styles.footerTitle}>Buscando libro...</Text>
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              style={styles.footerSpinner}
+            />
+          ) : (
+            <Text style={styles.footerIcon}>📖</Text>
+          )}
+          {scanned ? (
+            <View style={styles.footerTextCol}>
+              <Text style={styles.footerTitle}>Buscando libro…</Text>
               <Text style={styles.footerSubtitle}>
-                Obteniendo datos del ISBN
+                Consultando el ISBN en el servidor
               </Text>
             </View>
           ) : (
-            <View>
+            <View style={styles.footerTextCol}>
               <Text style={styles.footerTitle}>
                 Apunta al código de barras
               </Text>
@@ -359,18 +376,28 @@ function createStyles(colors: AppColorsPalette) {
       alignItems: "center",
     },
     footerCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
       backgroundColor: "rgba(0,0,0,0.75)",
       borderRadius: 20,
       paddingVertical: 20,
       paddingHorizontal: 24,
-      alignItems: "center",
       minWidth: "100%",
       borderWidth: 1,
       borderColor: "rgba(255,255,255,0.1)",
     },
+    footerSpinner: {
+      marginLeft: 4,
+    },
     footerIcon: {
       fontSize: 32,
-      marginBottom: 10,
+      width: 36,
+      textAlign: "center",
+    },
+    footerTextCol: {
+      flex: 1,
+      minWidth: 0,
     },
     footerTitle: {
       fontSize: 17,

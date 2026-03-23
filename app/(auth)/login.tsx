@@ -1,21 +1,21 @@
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { AuthApiError, useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 
@@ -24,48 +24,65 @@ export default function LoginScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { login, enableBiometric, biometricAvailable } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [enablingBiometric, setEnablingBiometric] = useState(false);
   const [useBiometricNext, setUseBiometricNext] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert("Error", "Introduce email y contraseña");
+      appAlert(
+        "Faltan datos",
+        "Introduce tu correo y contraseña para continuar.",
+        undefined,
+        { tone: "warning" },
+      );
       return;
     }
     setLoading(true);
     try {
       await login(email.trim(), password);
       if (useBiometricNext && biometricAvailable) {
-        Alert.alert(
-          "Activar inicio con biometría",
-          "Vas a activar el inicio de sesión con Face ID / Touch ID para tus próximos accesos.",
+        appAlert(
+          "¿Activar acceso rápido?",
+          "La próxima vez podrás entrar con la huella o el rostro de tu dispositivo, sin escribir la contraseña.",
           [
             {
-              text: "Cancelar",
+              text: "Ahora no",
               style: "cancel",
               onPress: () => {
                 router.replace("/(tabs)");
               },
             },
             {
-              text: "Continuar",
+              text: "Activar",
               onPress: async () => {
+                setEnablingBiometric(true);
                 try {
                   await enableBiometric();
                 } catch (e) {
                   const msg =
                     e instanceof AuthApiError
                       ? e.message
-                      : "No se pudo activar el inicio con biometría";
-                  Alert.alert("Error", msg);
+                      : "No pudimos activar el acceso biométrico.";
+                  setTimeout(() => {
+                    appAlert(
+                      "No se activó el acceso rápido",
+                      msg,
+                      undefined,
+                      { tone: "error" },
+                    );
+                  }, 350);
                 } finally {
+                  setEnablingBiometric(false);
                   router.replace("/(tabs)");
                 }
               },
             },
           ],
+          { tone: "info" },
         );
       } else {
         router.replace("/(tabs)");
@@ -73,24 +90,39 @@ export default function LoginScreen() {
     } catch (e) {
       const msg =
         e instanceof AuthApiError ? e.message : "Error al iniciar sesión";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos iniciar sesión",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
-    Alert.alert(
-      "Google",
-      "Configura EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID y el flujo OAuth para obtener el idToken y llamar a loginWithGoogle(idToken). Por ahora usa email/contraseña o biométrico.",
+    appAlert(
+      "Google en camino",
+      "Pronto podrás entrar con Google. Mientras tanto, usa correo y contraseña o el acceso con huella o rostro si ya lo activaste.",
+      undefined,
+      { tone: "info" },
     );
   };
 
   const { width: screenWidth } = useWindowDimensions();
   const sidePadding = 24;
 
+  const busy = loading || enablingBiometric;
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      {enablingBiometric ? (
+        <View style={styles.busyOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.busyOverlayText}>Activando acceso rápido…</Text>
+        </View>
+      ) : null}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboard}
@@ -121,7 +153,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-              editable={!loading}
+              editable={!busy}
             />
             <TextInput
               style={styles.input}
@@ -130,14 +162,14 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              editable={!loading}
+              editable={!busy}
             />
 
             {biometricAvailable && (
               <TouchableOpacity
                 style={styles.biometricRow}
                 onPress={() => setUseBiometricNext((v) => !v)}
-                disabled={loading}
+                disabled={busy}
               >
                 <View
                   style={[
@@ -151,15 +183,15 @@ export default function LoginScreen() {
                   numberOfLines={2}
                   maxFontSizeMultiplier={1.3}
                 >
-                  Usar Face ID / Touch ID en el próximo inicio
+                  Usar huella o rostro en el próximo inicio
                 </Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, busy && styles.buttonDisabled]}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={busy}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
@@ -175,7 +207,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.googleButton}
               onPress={handleGoogle}
-              disabled={loading}
+              disabled={busy}
             >
               <View style={styles.buttonInner}>
                 <Text
@@ -192,7 +224,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.link}
               onPress={() => router.push("/(auth)/register")}
-              disabled={loading}
+              disabled={busy}
             >
               <View style={styles.buttonInner}>
                 <Text style={styles.linkText} textBreakStrategy="simple">
@@ -212,6 +244,21 @@ function createStyles(colors: AppColorsPalette) {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    busyOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(15, 17, 23, 0.45)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 50,
+      gap: 12,
+    },
+    busyOverlayText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+      paddingHorizontal: 24,
+      textAlign: "center",
     },
     keyboard: {
       flex: 1,

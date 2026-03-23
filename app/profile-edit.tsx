@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -18,6 +17,7 @@ import {
 } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
@@ -28,6 +28,7 @@ export default function ProfileEditScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, token, refreshUser } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [nombre, setNombre] = useState(user?.name ?? "");
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
@@ -37,7 +38,12 @@ export default function ProfileEditScreen() {
   const handleSave = async () => {
     const trim = nombre.trim();
     if (!trim) {
-      Alert.alert("Error", "El nombre no puede estar vacío");
+      appAlert(
+        "El nombre es obligatorio",
+        "Así te reconoceremos en la app y en tu biblioteca.",
+        undefined,
+        { tone: "warning" },
+      );
       return;
     }
     if (!token) return;
@@ -45,12 +51,20 @@ export default function ProfileEditScreen() {
     try {
       await updateMe(token, { name: trim });
       await refreshUser();
-      Alert.alert("Guardado", "Perfil actualizado", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      appAlert(
+        "Perfil actualizado",
+        "Tu nombre ya está guardado.",
+        [{ text: "Volver", onPress: () => router.back() }],
+        { tone: "success" },
+      );
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al guardar";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos guardar",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
     }

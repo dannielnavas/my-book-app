@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Image,
     Modal,
     ScrollView,
@@ -18,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
 import { getLevelProgress } from "@/constants/gamification";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
@@ -37,6 +37,7 @@ export default function BookDetailScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user, refreshUser } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [pagesInput, setPagesInput] = useState("");
@@ -47,6 +48,7 @@ export default function BookDetailScreen() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successGifUrl, setSuccessGifUrl] = useState<string | null>(null);
   const [successGifLoading, setSuccessGifLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const loadingRef = useRef(false);
   const lastLoadAtRef = useRef(0);
   const MIN_LOAD_INTERVAL_MS = 1500;
@@ -70,14 +72,17 @@ export default function BookDetailScreen() {
         (e instanceof ApiError ? e.message : null) ||
         (e instanceof Error ? e.message : null) ||
         "No se pudo cargar el libro";
-      Alert.alert("Error", String(msg).trim() || "No se pudo cargar el libro", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      appAlert(
+        "No pudimos abrir este libro",
+        String(msg).trim() || "Comprueba tu conexión e inténtalo de nuevo.",
+        [{ text: "Volver", onPress: () => router.back() }],
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [token, libroId, router]);
+  }, [token, libroId, router, appAlert]);
 
   useFocusEffect(
     useCallback(() => {
@@ -89,7 +94,12 @@ export default function BookDetailScreen() {
     if (!token || !book) return;
     const num = parseInt(pagesInput, 10);
     if (isNaN(num) || num < 0) {
-      Alert.alert("Error", "Introduce un número válido de páginas");
+      appAlert(
+        "Revisa el número de páginas",
+        "Usa un número igual o mayor que 0.",
+        undefined,
+        { tone: "warning" },
+      );
       return;
     }
     setUpdatingPages(true);
@@ -112,47 +122,67 @@ export default function BookDetailScreen() {
         };
       });
       await refreshUser();
-      const gif = await getCelebrationGif();
-      if (gif?.url) setCelebrationGifUrl(gif.url);
-
-      setShowSuccessModal(true);
-      setSuccessGifUrl(null);
-      setSuccessGifLoading(true);
-      getSuccessCelebrationGif("success")
-        .then((res) => {
-          if (res?.url) setSuccessGifUrl(res.url);
-        })
-        .finally(() => setSuccessGifLoading(false));
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al actualizar";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No se guardaron las páginas",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
+      return;
     } finally {
       setUpdatingPages(false);
     }
+
+    try {
+      const gif = await getCelebrationGif();
+      if (gif?.url) setCelebrationGifUrl(gif.url);
+    } catch {
+      // GIF opcional
+    }
+
+    setShowSuccessModal(true);
+    setSuccessGifUrl(null);
+    setSuccessGifLoading(true);
+    getSuccessCelebrationGif("success")
+      .then((res) => {
+        if (res?.url) setSuccessGifUrl(res.url);
+      })
+      .finally(() => setSuccessGifLoading(false));
   };
 
   const handleDelete = () => {
     if (!token || !book) return;
-    Alert.alert(
-      "Eliminar libro",
-      `¿Eliminar "${book.title}" de tu biblioteca?`,
+    appAlert(
+      "¿Quitar este libro?",
+      `«${book.title}» dejará de aparecer en tu biblioteca. Esta acción no se puede deshacer.`,
       [
         { text: "Cancelar", style: "cancel" },
         {
-          text: "Eliminar",
+          text: "Quitar de la biblioteca",
           style: "destructive",
           onPress: async () => {
+            setDeleting(true);
             try {
               await deleteBook(token, book.bookId);
               router.replace("/(tabs)");
             } catch (e) {
               const msg =
-                e instanceof ApiError ? e.message : "Error al eliminar";
-              Alert.alert("Error", msg);
+                e instanceof ApiError ? e.message : "No se pudo eliminar";
+              appAlert(
+                "No pudimos quitar el libro",
+                msg,
+                undefined,
+                { tone: "error" },
+              );
+            } finally {
+              setDeleting(false);
             }
           },
         },
       ],
+      { tone: "warning" },
     );
   };
 
@@ -185,6 +215,12 @@ export default function BookDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
+      {deleting ? (
+        <View style={styles.actionBlockingOverlay} pointerEvents="auto">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.actionBlockingText}>Eliminando de la biblioteca…</Text>
+        </View>
+      ) : null}
       <Modal
         visible={showSuccessModal}
         transparent
@@ -309,12 +345,13 @@ export default function BookDetailScreen() {
                 onChangeText={setPagesInput}
                 keyboardType="number-pad"
                 placeholder="0"
+                editable={!updatingPages && !deleting}
               />
               <Text style={styles.pagesOf}> / {totalPages}</Text>
               <TouchableOpacity
                 style={styles.pagesButton}
                 onPress={handleUpdatePages}
-                disabled={updatingPages}
+                disabled={updatingPages || deleting}
               >
                 {updatingPages ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -388,9 +425,10 @@ export default function BookDetailScreen() {
               lectura y la barra de avance.
             </Text>
             <TouchableOpacity
-              style={styles.cardHintButton}
+              style={[styles.cardHintButton, deleting && styles.actionDisabled]}
               onPress={handleEdit}
               activeOpacity={0.85}
+              disabled={deleting}
             >
               <Text style={styles.cardHintButtonText}>Editar libro</Text>
             </TouchableOpacity>
@@ -416,18 +454,24 @@ export default function BookDetailScreen() {
         {/* Acciones */}
         <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.editButton}
+            style={[styles.editButton, deleting && styles.actionDisabled]}
             onPress={handleEdit}
             activeOpacity={0.9}
+            disabled={deleting}
           >
             <Text style={styles.editButtonText}>Editar libro</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.deleteButton}
+            style={[styles.deleteButton, deleting && styles.actionDisabled]}
             onPress={handleDelete}
             activeOpacity={0.9}
+            disabled={deleting}
           >
-            <Text style={styles.deleteButtonText}>Eliminar libro</Text>
+            {deleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Text style={styles.deleteButtonText}>Eliminar libro</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -440,6 +484,22 @@ function createStyles(colors: AppColorsPalette) {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    actionBlockingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(15, 17, 23, 0.35)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 50,
+      gap: 12,
+    },
+    actionBlockingText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    actionDisabled: {
+      opacity: 0.55,
     },
     centered: {
       flex: 1,

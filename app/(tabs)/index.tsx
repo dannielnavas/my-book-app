@@ -4,7 +4,6 @@ import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Image,
     Modal,
@@ -19,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
@@ -48,6 +48,7 @@ export default function BibliotecaScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -193,12 +194,17 @@ export default function BibliotecaScreen() {
     } catch (e) {
       const msg =
         e instanceof ApiError ? e.message : "Error al cargar la biblioteca";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos cargar tu biblioteca",
+        String(msg).trim(),
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token]);
+  }, [token, appAlert]);
 
   useEffect(() => {
     load();
@@ -241,9 +247,12 @@ export default function BibliotecaScreen() {
     load();
   };
 
-  const onBookPress = (libroId: number) => {
-    router.push({ pathname: "/book/[id]", params: { id: String(libroId) } });
-  };
+  const onBookPress = useCallback(
+    (libroId: number) => {
+      router.push({ pathname: "/book/[id]", params: { id: String(libroId) } });
+    },
+    [router],
+  );
 
   const openGroupModalForBook = useCallback((bookId: number) => {
     setGroupModalBookId(bookId);
@@ -313,6 +322,154 @@ export default function BibliotecaScreen() {
     persistGroups,
     closeGroupModal,
   ]);
+
+  const createListModalPrimaryLabel = useMemo(() => {
+    const name = groupNameInput.trim();
+    if (!name) return "Crear lista";
+    const existing = customGroups.find(
+      (g) => g.name.toLowerCase() === name.toLowerCase(),
+    );
+    return existing ? "Agregar a lista" : "Crear lista";
+  }, [groupNameInput, customGroups]);
+
+  const listsByBookId = useMemo(() => {
+    const map = new Map<number, CustomGroup[]>();
+    for (const g of customGroups) {
+      for (const bid of g.bookIds) {
+        const prev = map.get(bid);
+        if (prev) prev.push(g);
+        else map.set(bid, [g]);
+      }
+    }
+    return map;
+  }, [customGroups]);
+
+  const removeBookFromList = useCallback(
+    (groupId: string, bookId: number) => {
+      const next = customGroups.map((g) =>
+        g.id === groupId
+          ? { ...g, bookIds: g.bookIds.filter((id) => id !== bookId) }
+          : g,
+      );
+      persistGroups(next);
+    },
+    [customGroups, persistGroups],
+  );
+
+  const renderBookCard = useCallback(
+    (item: Book) => {
+      const total = item.totalPages ?? 0;
+      const read = item.pagesRead ?? 0;
+      const progress = total > 0 ? Math.min(1, read / total) : 0;
+      const statusLabel =
+        ESTADO_LABEL[item.readingStatus] ?? item.readingStatus ?? "";
+      const listsForBook =
+        item.bookId != null ? listsByBookId.get(item.bookId) ?? [] : [];
+
+      return (
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => item.bookId != null && onBookPress(item.bookId)}
+          activeOpacity={0.92}
+        >
+          <View style={styles.coverWrap}>
+            {item.imageUrl ? (
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.cover}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.coverPlaceholder}>
+                <Text style={styles.coverPlaceholderText}>📖</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.cardContent}>
+            <View style={styles.cardTitleRow}>
+              <Text style={styles.title} numberOfLines={2}>
+                {item.title || "Sin título"}
+              </Text>
+              {item.bookId != null && listsForBook.length === 0 ? (
+                <TouchableOpacity
+                  style={styles.groupIconButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => openGroupModalForBook(item.bookId!)}
+                >
+                  <Ionicons
+                    name="folder-open-outline"
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {item.author ? (
+              <Text style={styles.author} numberOfLines={1}>
+                {item.author}
+              </Text>
+            ) : null}
+            {listsForBook.length > 0 ? (
+              <View style={styles.bookListsRow}>
+                {listsForBook.map((g) => (
+                  <View key={g.id} style={styles.bookListChip}>
+                    <Text style={styles.bookListChipText} numberOfLines={1}>
+                      {g.name}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.bookListChipRemove}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      onPress={() =>
+                        item.bookId != null &&
+                        removeBookFromList(g.id, item.bookId)
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Quitar de la lista ${g.name}`}
+                    >
+                      <Ionicons
+                        name="close-circle"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {statusLabel ? (
+              <View style={styles.statusChip}>
+                <Text style={styles.statusChipText}>{statusLabel}</Text>
+              </View>
+            ) : null}
+            {total > 0 && (
+              <View style={styles.progressWrap}>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${progress * 100}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.pages}>
+                  {read} / {total}{" "}
+                  <Text style={styles.pagesLabel}>págs.</Text>
+                </Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [
+      styles,
+      colors.textSecondary,
+      onBookPress,
+      openGroupModalForBook,
+      listsByBookId,
+      removeBookFromList,
+    ],
+  );
 
   if (loading) {
     return (
@@ -411,83 +568,7 @@ export default function BibliotecaScreen() {
           renderSectionHeader={({ section }) => (
             <Text style={styles.sectionHeader}>{section.title}</Text>
           )}
-          renderItem={({ item }) => {
-            const total = item.totalPages ?? 0;
-            const read = item.pagesRead ?? 0;
-            const progress = total > 0 ? Math.min(1, read / total) : 0;
-            const statusLabel =
-              ESTADO_LABEL[item.readingStatus] ?? item.readingStatus ?? "";
-
-            return (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() =>
-                  item.bookId != null && onBookPress(item.bookId)
-                }
-                activeOpacity={0.92}
-              >
-                <View style={styles.coverWrap}>
-                  {item.imageUrl ? (
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={styles.cover}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.coverPlaceholder}>
-                      <Text style={styles.coverPlaceholderText}>📖</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.cardContent}>
-                  <View style={styles.cardTitleRow}>
-                    <Text style={styles.title} numberOfLines={2}>
-                      {item.title || "Sin título"}
-                    </Text>
-                    {item.bookId != null && (
-                      <TouchableOpacity
-                        style={styles.groupIconButton}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => openGroupModalForBook(item.bookId!)}
-                      >
-                        <Ionicons
-                          name="folder-open-outline"
-                          size={18}
-                          color={colors.textSecondary}
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  {item.author ? (
-                    <Text style={styles.author} numberOfLines={1}>
-                      {item.author}
-                    </Text>
-                  ) : null}
-                  {statusLabel ? (
-                    <View style={styles.statusChip}>
-                      <Text style={styles.statusChipText}>{statusLabel}</Text>
-                    </View>
-                  ) : null}
-                  {total > 0 && (
-                    <View style={styles.progressWrap}>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${progress * 100}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.pages}>
-                        {read} / {total}{" "}
-                        <Text style={styles.pagesLabel}>págs.</Text>
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item }) => renderBookCard(item)}
         />
       ) : (
         <FlatList
@@ -529,83 +610,7 @@ export default function BibliotecaScreen() {
               )}
             </View>
           }
-          renderItem={({ item }) => {
-            const total = item.totalPages ?? 0;
-            const read = item.pagesRead ?? 0;
-            const progress = total > 0 ? Math.min(1, read / total) : 0;
-            const statusLabel =
-              ESTADO_LABEL[item.readingStatus] ?? item.readingStatus ?? "";
-
-            return (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() =>
-                  item.bookId != null && onBookPress(item.bookId)
-                }
-                activeOpacity={0.92}
-              >
-                <View style={styles.coverWrap}>
-                  {item.imageUrl ? (
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={styles.cover}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.coverPlaceholder}>
-                      <Text style={styles.coverPlaceholderText}>📖</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.cardContent}>
-                  <View style={styles.cardTitleRow}>
-                    <Text style={styles.title} numberOfLines={2}>
-                      {item.title || "Sin título"}
-                    </Text>
-                    {item.bookId != null && (
-                      <TouchableOpacity
-                        style={styles.groupIconButton}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => openGroupModalForBook(item.bookId!)}
-                      >
-                        <Ionicons
-                          name="folder-open-outline"
-                          size={18}
-                          color={colors.textSecondary}
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  {item.author ? (
-                    <Text style={styles.author} numberOfLines={1}>
-                      {item.author}
-                    </Text>
-                  ) : null}
-                  {statusLabel ? (
-                    <View style={styles.statusChip}>
-                      <Text style={styles.statusChipText}>{statusLabel}</Text>
-                    </View>
-                  ) : null}
-                  {total > 0 && (
-                    <View style={styles.progressWrap}>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${progress * 100}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.pages}>
-                        {read} / {total}{" "}
-                        <Text style={styles.pagesLabel}>págs.</Text>
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item }) => renderBookCard(item)}
         />
       )}
       <Modal
@@ -613,6 +618,7 @@ export default function BibliotecaScreen() {
         animationType="slide"
         transparent
         onRequestClose={() => setFiltersVisible(false)}
+        style={styles.modal}
       >
         <View style={styles.sidebarOverlay}>
           <TouchableOpacity
@@ -787,9 +793,10 @@ export default function BibliotecaScreen() {
                               styles.modalGroupItem,
                               isInGroup && styles.modalGroupItemActive,
                             ]}
-                            onPress={() =>
-                              handleToggleGroupMembership(group.id)
-                            }
+                            onPress={() => {
+                              handleToggleGroupMembership(group.id);
+                              setGroupNameInput(group.name);
+                            }}
                           >
                             <Text
                               style={[
@@ -841,7 +848,7 @@ export default function BibliotecaScreen() {
                     onPress={handleCreateGroupAndAdd}
                   >
                     <Text style={styles.modalButtonPrimaryText}>
-                      Crear lista
+                      {createListModalPrimaryLabel}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1050,6 +1057,37 @@ function createStyles(colors: AppColorsPalette) {
       color: colors.textSecondary,
       marginBottom: 10,
       letterSpacing: 0.1,
+    },
+    bookListsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginTop: 2,
+      marginBottom: 8,
+    },
+    bookListChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      maxWidth: "100%",
+      backgroundColor: colors.primary + "12",
+      borderWidth: 1,
+      borderColor: colors.primary + "35",
+      paddingLeft: 8,
+      paddingRight: 4,
+      paddingVertical: 4,
+      borderRadius: 14,
+      marginRight: 6,
+      marginBottom: 4,
+    },
+    bookListChipText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.primary,
+      flexShrink: 1,
+      maxWidth: 140,
+    },
+    bookListChipRemove: {
+      marginLeft: 2,
+      padding: 2,
     },
     statusChip: {
       alignSelf: "flex-start",
@@ -1270,6 +1308,11 @@ function createStyles(colors: AppColorsPalette) {
       fontSize: 14,
       fontWeight: "600",
       color: "#fff",
+    },
+    modal: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.35)",
+      padding: 20,
     },
   });
 }

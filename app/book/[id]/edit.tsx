@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Image,
     KeyboardAvoidingView,
     Platform,
@@ -16,6 +15,7 @@ import {
 } from "react-native";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
@@ -31,6 +31,7 @@ export default function EditBookScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const { isPaid } = getEntitlements(user);
   const libroId = id ? parseInt(id, 10) : NaN;
   const [book, setBook] = useState<Book | null>(null);
@@ -68,11 +69,16 @@ export default function EditBookScreen() {
       setCoverLocalUri(null);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al cargar";
-      Alert.alert("Error", msg, [{ text: "OK", onPress: () => router.back() }]);
+      appAlert(
+        "No pudimos cargar el libro",
+        msg,
+        [{ text: "Volver", onPress: () => router.back() }],
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
     }
-  }, [token, libroId, router]);
+  }, [token, libroId, router, appAlert]);
 
   useEffect(() => {
     load();
@@ -80,10 +86,11 @@ export default function EditBookScreen() {
 
   const handleTakeCoverPhoto = async () => {
     if (!isPaid) {
-      Alert.alert(
-        "Función Premium",
-        "Tomar foto de la portada es exclusivo para usuarios Premium o De por vida. Actualiza tu plan para usarla.",
-        [{ text: "Entendido" }],
+      appAlert(
+        "Foto de portada — Premium",
+        "La cámara para la portada está en planes Premium o De por vida.",
+        undefined,
+        { tone: "info" },
       );
       return;
     }
@@ -91,18 +98,22 @@ export default function EditBookScreen() {
     if (!token || !book) return;
 
     if (Platform.OS === "web") {
-      Alert.alert(
-        "No disponible",
-        "Tomar foto de la portada solo está disponible en dispositivos móviles.",
+      appAlert(
+        "Solo en el móvil",
+        "La cámara para la portada no está disponible en la versión web.",
+        undefined,
+        { tone: "info" },
       );
       return;
     }
 
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
-        "Permiso requerido",
-        "Necesitamos acceso a la cámara para tomar la foto de la portada.",
+      appAlert(
+        "Permiso de cámara",
+        "Activa el acceso a la cámara en los ajustes del sistema.",
+        undefined,
+        { tone: "warning" },
       );
       return;
     }
@@ -124,11 +135,21 @@ export default function EditBookScreen() {
       const res = await uploadBookCover(token, book.bookId, asset.uri);
       setImagenUrl(res.imageUrl ? res.imageUrl.replace(/^http:\/\//i, "https://") : "");
       if (res.book) setBook(res.book);
-      Alert.alert("Portada actualizada", "La nueva portada se ha guardado.");
+      appAlert(
+        "Portada actualizada",
+        "La nueva imagen ya se ve en tu biblioteca.",
+        undefined,
+        { tone: "success" },
+      );
     } catch (e) {
       const msg =
         e instanceof ApiError ? e.message : "Error al subir la portada";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No se subió la portada",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setUploadingCover(false);
     }
@@ -137,7 +158,12 @@ export default function EditBookScreen() {
   const handleSave = async () => {
     const titleTrim = titulo.trim();
     if (!titleTrim) {
-      Alert.alert("Error", "El título es obligatorio");
+      appAlert(
+        "Falta el título",
+        "Cada libro necesita un título en tu biblioteca.",
+        undefined,
+        { tone: "warning" },
+      );
       return;
     }
     if (!token || !book) return;
@@ -154,12 +180,20 @@ export default function EditBookScreen() {
         imageUrl: imagenUrl.trim() ? imagenUrl.trim().replace(/^http:\/\//i, "https://") : undefined,
         readingStatus: readingStatus,
       });
-      Alert.alert("Guardado", "Cambios guardados", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      appAlert(
+        "Cambios guardados",
+        "Tu libro está al día.",
+        [{ text: "Listo", onPress: () => router.back() }],
+        { tone: "success" },
+      );
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al guardar";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos guardar",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setSaving(false);
     }

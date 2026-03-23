@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { AppDialogProvider } from '@/context/AppDialogContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -51,7 +52,9 @@ export const unstable_settings = {
 export default function Layout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <AppDialogProvider>
+        <RootNavigator />
+      </AppDialogProvider>
     </AuthProvider>
   );
 }

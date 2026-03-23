@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Image,
     Keyboard,
@@ -15,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
@@ -26,6 +26,7 @@ export default function SearchScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { token } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ResultadoBusqueda[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,11 +41,16 @@ export default function SearchScreen() {
       setResults(list);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al buscar";
-      Alert.alert("Error", msg);
+      appAlert(
+        "No pudimos buscar",
+        msg,
+        undefined,
+        { tone: "error" },
+      );
     } finally {
       setLoading(false);
     }
-  }, [query, token]);
+  }, [query, token, appAlert]);
 
   const onSelect = (item: ResultadoBusqueda) => {
     router.replace({
@@ -65,6 +71,7 @@ export default function SearchScreen() {
           onSubmitEditing={search}
           returnKeyType="search"
           autoFocus
+          editable={!loading}
         />
         <TouchableOpacity
           style={styles.searchButton}
@@ -84,7 +91,12 @@ export default function SearchScreen() {
         keyExtractor={(item, i) => item.externalId ?? `${i}-${item.title}`}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          !loading && query.trim() ? (
+          loading && query.trim() ? (
+            <View style={styles.emptyLoading}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.emptyLoadingText}>Buscando en la base de datos…</Text>
+            </View>
+          ) : !loading && query.trim() ? (
             <View style={styles.empty}>
               <Text style={styles.emptyText}>Sin resultados</Text>
               <TouchableOpacity
@@ -174,6 +186,16 @@ function createStyles(colors: AppColorsPalette) {
     empty: {
       paddingVertical: 48,
       alignItems: "center",
+    },
+    emptyLoading: {
+      paddingVertical: 56,
+      alignItems: "center",
+      gap: 16,
+    },
+    emptyLoadingText: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: "center",
     },
     emptyText: {
       fontSize: 16,

@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -16,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { AppColorsPalette } from "@/constants/colors";
 import { getLevelProgress } from "@/constants/gamification";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { getMe } from "@/lib/users-api";
@@ -26,8 +26,10 @@ export default function ProfileScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user: authUser, token, logout } = useAuth();
+  const { alert: appAlert } = useAppDialog();
   const [user, setUser] = useState<Usuario | null>(authUser ?? null);
   const [loading, setLoading] = useState(!!token && !authUser);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const loadUser = useCallback(async () => {
     if (!token) return;
@@ -47,17 +49,27 @@ export default function ProfileScreen() {
   }, [authUser, token, loadUser]);
 
   const handleLogout = () => {
-    Alert.alert("Cerrar sesión", "¿Seguro que quieres cerrar sesión?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Cerrar sesión",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/(auth)/login");
+    appAlert(
+      "¿Cerrar sesión?",
+      "Tendrás que volver a entrar para ver tu biblioteca y tu progreso.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar sesión",
+          style: "destructive",
+          onPress: async () => {
+            setLoggingOut(true);
+            try {
+              await logout();
+              router.replace("/(auth)/login");
+            } finally {
+              setLoggingOut(false);
+            }
+          },
         },
-      },
-    ]);
+      ],
+      { tone: "warning" },
+    );
   };
 
   const handleEditProfile = () => router.push("/profile-edit");
@@ -121,6 +133,7 @@ export default function ProfileScreen() {
             style={styles.btnSecondary}
             onPress={handleScan}
             activeOpacity={0.8}
+            disabled={loggingOut}
           >
             <Ionicons
               name="scan-outline"
@@ -133,6 +146,7 @@ export default function ProfileScreen() {
             style={styles.btnPrimary}
             onPress={handleRecommendations}
             activeOpacity={0.8}
+            disabled={loggingOut}
           >
             <Ionicons
               name="sparkles-outline"
@@ -235,12 +249,23 @@ export default function ProfileScreen() {
 
       {/* Cerrar sesión */}
       <TouchableOpacity
-        style={[styles.logoutWrap, { width: contentWidth }]}
+        style={[
+          styles.logoutWrap,
+          { width: contentWidth },
+          loggingOut && styles.logoutWrapDisabled,
+        ]}
         onPress={handleLogout}
         activeOpacity={0.8}
+        disabled={loggingOut}
       >
-        <Text style={styles.logoutText}>Cerrar sesión</Text>
-        <Ionicons name="log-out-outline" size={22} color={colors.error} />
+        {loggingOut ? (
+          <ActivityIndicator size="small" color={colors.error} />
+        ) : (
+          <>
+            <Text style={styles.logoutText}>Cerrar sesión</Text>
+            <Ionicons name="log-out-outline" size={22} color={colors.error} />
+          </>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -518,6 +543,9 @@ function createStyles(colors: AppColorsPalette) {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    logoutWrapDisabled: {
+      opacity: 0.75,
     },
     logoutText: {
       fontSize: 15,
