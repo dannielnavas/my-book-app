@@ -23,12 +23,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
 import { getBooks } from "@/lib/books-api";
-import type { Libro } from "@/types/api";
+import type { Book } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: "Pendiente",
-  en_lectura: "En lectura",
-  leido: "Leído",
+  pending: "Pendiente",
+  in_progress: "En lectura",
+  read: "Leído",
 };
 
 const TAB_BAR_HEIGHT = 56;
@@ -48,7 +48,7 @@ export default function BibliotecaScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
-  const [books, setBooks] = useState<Libro[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -129,13 +129,13 @@ export default function BibliotecaScreen() {
     const arr = [...books];
     if (sortMode === "title") {
       arr.sort((a, b) =>
-        (a.titulo ?? "").localeCompare(b.titulo ?? "", "es", {
+        (a.title ?? "").localeCompare(b.title ?? "", "es", {
           sensitivity: "base",
         }),
       );
     } else if (sortMode === "author") {
       arr.sort((a, b) =>
-        (a.autor ?? "").localeCompare(b.autor ?? "", "es", {
+        (a.author ?? "").localeCompare(b.author ?? "", "es", {
           sensitivity: "base",
         }),
       );
@@ -150,24 +150,24 @@ export default function BibliotecaScreen() {
       const group = customGroups.find((g) => g.id === selectedGroupId);
       if (group) {
         const ids = new Set(group.bookIds);
-        source = source.filter((b) => b.libroId != null && ids.has(b.libroId));
+        source = source.filter((b) => b.bookId != null && ids.has(b.bookId));
       }
     }
 
     const q = searchQuery.trim().toLowerCase();
     if (!q) return source;
     return source.filter((b) => {
-      const titulo = (b.titulo ?? "").toLowerCase();
-      const autor = (b.autor ?? "").toLowerCase();
+      const titulo = (b.title ?? "").toLowerCase();
+      const autor = (b.author ?? "").toLowerCase();
       return titulo.includes(q) || autor.includes(q);
     });
   }, [sortedBooks, searchQuery, selectedGroupId, customGroups]);
 
   const groupedByAuthor = useMemo(() => {
     if (!groupByAuthor) return null;
-    const map = new Map<string, Libro[]>();
+    const map = new Map<string, Book[]>();
     filteredBooks.forEach((b) => {
-      const rawAuthor = (b.autor ?? "").trim();
+      const rawAuthor = (b.author ?? "").trim();
       const author = rawAuthor.length > 0 ? rawAuthor : "Sin autor";
       const current = map.get(author);
       if (current) {
@@ -372,7 +372,7 @@ export default function BibliotecaScreen() {
         <SectionList
           sections={groupedByAuthor ?? []}
           keyExtractor={(item, index) =>
-            `book-${item.libroId ?? index}-${index}`
+            `book-${item.bookId ?? index}-${index}`
           }
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
@@ -412,24 +412,24 @@ export default function BibliotecaScreen() {
             <Text style={styles.sectionHeader}>{section.title}</Text>
           )}
           renderItem={({ item }) => {
-            const total = item.paginasTotales ?? 0;
-            const read = item.paginasLeidas ?? 0;
+            const total = item.totalPages ?? 0;
+            const read = item.pagesRead ?? 0;
             const progress = total > 0 ? Math.min(1, read / total) : 0;
             const statusLabel =
-              ESTADO_LABEL[item.estadoLectura] ?? item.estadoLectura ?? "";
+              ESTADO_LABEL[item.readingStatus] ?? item.readingStatus ?? "";
 
             return (
               <TouchableOpacity
                 style={styles.card}
                 onPress={() =>
-                  item.libroId != null && onBookPress(item.libroId)
+                  item.bookId != null && onBookPress(item.bookId)
                 }
                 activeOpacity={0.92}
               >
                 <View style={styles.coverWrap}>
-                  {item.imagenUrl ? (
+                  {item.imageUrl ? (
                     <Image
-                      source={{ uri: item.imagenUrl }}
+                      source={{ uri: item.imageUrl }}
                       style={styles.cover}
                       resizeMode="cover"
                     />
@@ -442,13 +442,13 @@ export default function BibliotecaScreen() {
                 <View style={styles.cardContent}>
                   <View style={styles.cardTitleRow}>
                     <Text style={styles.title} numberOfLines={2}>
-                      {item.titulo || "Sin título"}
+                      {item.title || "Sin título"}
                     </Text>
-                    {item.libroId != null && (
+                    {item.bookId != null && (
                       <TouchableOpacity
                         style={styles.groupIconButton}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => openGroupModalForBook(item.libroId!)}
+                        onPress={() => openGroupModalForBook(item.bookId!)}
                       >
                         <Ionicons
                           name="folder-open-outline"
@@ -458,9 +458,9 @@ export default function BibliotecaScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
-                  {item.autor ? (
+                  {item.author ? (
                     <Text style={styles.author} numberOfLines={1}>
-                      {item.autor}
+                      {item.author}
                     </Text>
                   ) : null}
                   {statusLabel ? (
@@ -493,7 +493,7 @@ export default function BibliotecaScreen() {
         <FlatList
           data={filteredBooks}
           keyExtractor={(item, index) =>
-            `book-${item.libroId ?? index}-${index}`
+            `book-${item.bookId ?? index}-${index}`
           }
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
@@ -530,24 +530,24 @@ export default function BibliotecaScreen() {
             </View>
           }
           renderItem={({ item }) => {
-            const total = item.paginasTotales ?? 0;
-            const read = item.paginasLeidas ?? 0;
+            const total = item.totalPages ?? 0;
+            const read = item.pagesRead ?? 0;
             const progress = total > 0 ? Math.min(1, read / total) : 0;
             const statusLabel =
-              ESTADO_LABEL[item.estadoLectura] ?? item.estadoLectura ?? "";
+              ESTADO_LABEL[item.readingStatus] ?? item.readingStatus ?? "";
 
             return (
               <TouchableOpacity
                 style={styles.card}
                 onPress={() =>
-                  item.libroId != null && onBookPress(item.libroId)
+                  item.bookId != null && onBookPress(item.bookId)
                 }
                 activeOpacity={0.92}
               >
                 <View style={styles.coverWrap}>
-                  {item.imagenUrl ? (
+                  {item.imageUrl ? (
                     <Image
-                      source={{ uri: item.imagenUrl }}
+                      source={{ uri: item.imageUrl }}
                       style={styles.cover}
                       resizeMode="cover"
                     />
@@ -560,13 +560,13 @@ export default function BibliotecaScreen() {
                 <View style={styles.cardContent}>
                   <View style={styles.cardTitleRow}>
                     <Text style={styles.title} numberOfLines={2}>
-                      {item.titulo || "Sin título"}
+                      {item.title || "Sin título"}
                     </Text>
-                    {item.libroId != null && (
+                    {item.bookId != null && (
                       <TouchableOpacity
                         style={styles.groupIconButton}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => openGroupModalForBook(item.libroId!)}
+                        onPress={() => openGroupModalForBook(item.bookId!)}
                       >
                         <Ionicons
                           name="folder-open-outline"
@@ -576,9 +576,9 @@ export default function BibliotecaScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
-                  {item.autor ? (
+                  {item.author ? (
                     <Text style={styles.author} numberOfLines={1}>
-                      {item.autor}
+                      {item.author}
                     </Text>
                   ) : null}
                   {statusLabel ? (

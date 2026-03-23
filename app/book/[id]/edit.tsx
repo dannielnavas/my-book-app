@@ -1,18 +1,18 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import type { AppColorsPalette } from "@/constants/colors";
@@ -20,18 +20,20 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
 import { getBook, updateBook, uploadBookCover } from "@/lib/books-api";
-import type { EstadoLectura, Libro } from "@/types/api";
+import { getEntitlements } from "@/lib/plans";
+import type { ReadingStatus, Book } from "@/types/api";
 
-const ESTADOS: EstadoLectura[] = ["pendiente", "en_lectura", "leido"];
+const ESTADOS: ReadingStatus[] = ["pending", "in_progress", "read"];
 
 export default function EditBookScreen() {
   const router = useRouter();
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { isPaid } = getEntitlements(user);
   const libroId = id ? parseInt(id, 10) : NaN;
-  const [book, setBook] = useState<Libro | null>(null);
+  const [book, setBook] = useState<Book | null>(null);
   const [titulo, setTitulo] = useState("");
   const [autor, setAutor] = useState("");
   const [isbn, setIsbn] = useState("");
@@ -40,8 +42,8 @@ export default function EditBookScreen() {
   const [paginasLeidas, setPaginasLeidas] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [imagenUrl, setImagenUrl] = useState("");
-  const [estadoLectura, setEstadoLectura] =
-    useState<EstadoLectura>("pendiente");
+  const [readingStatus, setReadingStatus] =
+    useState<ReadingStatus>("pending");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [coverLocalUri, setCoverLocalUri] = useState<string | null>(null);
@@ -52,17 +54,17 @@ export default function EditBookScreen() {
     try {
       const b = await getBook(token, libroId);
       setBook(b);
-      setTitulo(b.titulo);
-      setAutor(b.autor ?? "");
+      setTitulo(b.title);
+      setAutor(b.author ?? "");
       setIsbn(b.isbn ?? "");
-      setGenero(b.genero ?? "");
+      setGenero(b.genre ?? "");
       setPaginasTotales(
-        b.paginasTotales != null ? String(b.paginasTotales) : "",
+        b.totalPages != null ? String(b.totalPages) : "",
       );
-      setPaginasLeidas(b.paginasLeidas != null ? String(b.paginasLeidas) : "");
-      setDescripcion(b.descripcion ?? "");
-      setImagenUrl(b.imagenUrl ?? "");
-      setEstadoLectura(b.estadoLectura);
+      setPaginasLeidas(b.pagesRead != null ? String(b.pagesRead) : "");
+      setDescripcion(b.description ?? "");
+      setImagenUrl(b.imageUrl ? b.imageUrl.replace(/^http:\/\//i, "https://") : "");
+      setReadingStatus(b.readingStatus);
       setCoverLocalUri(null);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al cargar";
@@ -77,6 +79,15 @@ export default function EditBookScreen() {
   }, [load]);
 
   const handleTakeCoverPhoto = async () => {
+    if (!isPaid) {
+      Alert.alert(
+        "Función Premium",
+        "Tomar foto de la portada es exclusivo para usuarios Premium o De por vida. Actualiza tu plan para usarla.",
+        [{ text: "Entendido" }],
+      );
+      return;
+    }
+
     if (!token || !book) return;
 
     if (Platform.OS === "web") {
@@ -110,8 +121,8 @@ export default function EditBookScreen() {
     setCoverLocalUri(asset.uri);
     setUploadingCover(true);
     try {
-      const res = await uploadBookCover(token, book.libroId, asset.uri);
-      setImagenUrl(res.imageUrl);
+      const res = await uploadBookCover(token, book.bookId, asset.uri);
+      setImagenUrl(res.imageUrl ? res.imageUrl.replace(/^http:\/\//i, "https://") : "");
       if (res.book) setBook(res.book);
       Alert.alert("Portada actualizada", "La nueva portada se ha guardado.");
     } catch (e) {
@@ -132,7 +143,7 @@ export default function EditBookScreen() {
     if (!token || !book) return;
     setSaving(true);
     try {
-      await updateBook(token, book.libroId, {
+      await updateBook(token, book.bookId, {
         title: titleTrim,
         author: autor.trim() || undefined,
         isbn: isbn.trim() || undefined,
@@ -140,8 +151,8 @@ export default function EditBookScreen() {
         totalPages: paginasTotales ? parseInt(paginasTotales, 10) : undefined,
         pagesRead: paginasLeidas ? parseInt(paginasLeidas, 10) : undefined,
         description: descripcion.trim() || undefined,
-        imageUrl: imagenUrl.trim() || undefined,
-        readingStatus: estadoLectura,
+        imageUrl: imagenUrl.trim() ? imagenUrl.trim().replace(/^http:\/\//i, "https://") : undefined,
+        readingStatus: readingStatus,
       });
       Alert.alert("Guardado", "Cambios guardados", [
         { text: "OK", onPress: () => router.back() },
@@ -248,20 +259,20 @@ export default function EditBookScreen() {
               key={e}
               style={[
                 styles.estadoChip,
-                estadoLectura === e && styles.estadoChipActive,
+                readingStatus === e && styles.estadoChipActive,
               ]}
-              onPress={() => setEstadoLectura(e)}
+              onPress={() => setReadingStatus(e)}
               disabled={saving}
             >
               <Text
                 style={[
                   styles.estadoChipText,
-                  estadoLectura === e && styles.estadoChipTextActive,
+                  readingStatus === e && styles.estadoChipTextActive,
                 ]}
               >
-                {e === "pendiente"
+                {e === "pending"
                   ? "Pendiente"
-                  : e === "en_lectura"
+                  : e === "in_progress"
                     ? "En lectura"
                     : "Leído"}
               </Text>
@@ -285,10 +296,12 @@ export default function EditBookScreen() {
             onPress={handleTakeCoverPhoto}
             disabled={saving || uploadingCover}
             activeOpacity={0.8}
+            style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
           >
+            {!isPaid && <Text style={{ fontSize: 13 }}>🔒</Text>}
             <Text
               style={{
-                color: colors.primary,
+                color: isPaid ? colors.primary : colors.textSecondary,
                 fontWeight: "600",
                 fontSize: 13,
               }}
@@ -301,7 +314,7 @@ export default function EditBookScreen() {
         <TextInput
           style={styles.input}
           value={imagenUrl}
-          onChangeText={setImagenUrl}
+          onChangeText={(text) => setImagenUrl(text.replace(/^http:\/\//i, "https://"))}
           placeholder="https://..."
           placeholderTextColor={colors.textSecondary}
           autoCapitalize="none"
@@ -379,9 +392,14 @@ function createStyles(colors: AppColorsPalette) {
     estadoChipText: {
       fontSize: 14,
       color: colors.text,
+      width: "100%",
+      textAlign: "center",
     },
     estadoChipTextActive: {
       color: "#fff",
+
+      width: "100%",
+      textAlign: "center",
     },
     button: {
       backgroundColor: colors.primary,

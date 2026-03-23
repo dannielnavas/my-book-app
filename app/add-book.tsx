@@ -21,20 +21,22 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
 import { createBook, uploadBookCover } from "@/lib/books-api";
-import type { EstadoLectura, ResultadoBusqueda } from "@/types/api";
+import { getEntitlements } from "@/lib/plans";
+import type { ReadingStatus, ResultadoBusqueda } from "@/types/api";
 
-const ESTADOS: EstadoLectura[] = ["pendiente", "en_lectura", "leido"];
-const ESTADO_LABEL: Record<EstadoLectura, string> = {
-  pendiente: "Pendiente",
-  en_lectura: "En lectura",
-  leido: "Leído",
+const ESTADOS: ReadingStatus[] = ["pending", "in_progress", "read"];
+const ESTADO_LABEL: Record<ReadingStatus, string> = {
+  pending: "Pendiente",
+  in_progress: "En lectura",
+  read: "Leído",
 };
 
 export default function AddBookScreen() {
   const router = useRouter();
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { isPaid } = getEntitlements(user);
   const params = useLocalSearchParams<{ prefill?: string; isbn?: string }>();
   const [titulo, setTitulo] = useState("");
   const [autor, setAutor] = useState("");
@@ -43,8 +45,8 @@ export default function AddBookScreen() {
   const [paginasTotales, setPaginasTotales] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [imagenUrl, setImagenUrl] = useState("");
-  const [estadoLectura, setEstadoLectura] =
-    useState<EstadoLectura>("pendiente");
+  const [readingStatus, setReadingStatus] =
+    useState<ReadingStatus>("pending");
   const [loading, setLoading] = useState(false);
   const [coverLocalUri, setCoverLocalUri] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -70,6 +72,15 @@ export default function AddBookScreen() {
   }, [params.prefill, params.isbn]);
 
   const handleTakeCoverPhoto = async () => {
+    if (!isPaid) {
+      Alert.alert(
+        "Función Premium",
+        "Tomar foto de la portada es exclusivo para usuarios Premium o De por vida. Actualiza tu plan para usarla.",
+        [{ text: "Entendido" }],
+      );
+      return;
+    }
+
     if (Platform.OS === "web") {
       Alert.alert(
         "No disponible",
@@ -128,7 +139,7 @@ export default function AddBookScreen() {
         try {
           const res = await uploadBookCover(
             token,
-            created.libroId,
+            created.bookId,
             coverLocalUri,
           );
           setImagenUrl(res.imageUrl);
@@ -262,16 +273,16 @@ export default function AddBookScreen() {
                 key={e}
                 style={[
                   styles.estadoChip,
-                  estadoLectura === e && styles.estadoChipActive,
+                  readingStatus === e && styles.estadoChipActive,
                 ]}
-                onPress={() => setEstadoLectura(e)}
+                onPress={() => setReadingStatus(e)}
                 disabled={loading}
                 activeOpacity={0.8}
               >
                 <Text
                   style={[
                     styles.estadoChipText,
-                    estadoLectura === e && styles.estadoChipTextActive,
+                    readingStatus === e && styles.estadoChipTextActive,
                   ]}
                 >
                   {ESTADO_LABEL[e]}
@@ -308,10 +319,14 @@ export default function AddBookScreen() {
               onPress={handleTakeCoverPhoto}
               disabled={loading}
               activeOpacity={0.8}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
             >
+              {!isPaid && (
+                <Text style={{ fontSize: 13 }}>🔒</Text>
+              )}
               <Text
                 style={{
-                  color: colors.primary,
+                  color: isPaid ? colors.primary : colors.textSecondary,
                   fontWeight: "600",
                   fontSize: 13,
                 }}

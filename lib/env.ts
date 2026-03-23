@@ -3,7 +3,7 @@
  * Base URL de la API NestJS.
  */
 const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://192.168.10.21:3000/api";
+  process.env.EXPO_PUBLIC_API_URL ?? "http://192.168.10.39:3000/api";
 
 /** GIPHY API Key para GIFs de celebración (opcional). Obtener en https://developers.giphy.com/ */
 const GIPHY_API_KEY =

@@ -23,12 +23,12 @@ import { useAppColors } from "@/hooks/use-app-colors";
 import { ApiError } from "@/lib/api";
 import { deleteBook, getBook, updateBookPages } from "@/lib/books-api";
 import { getCelebrationGif, getSuccessCelebrationGif } from "@/lib/giphy-api";
-import type { Libro } from "@/types/api";
+import type { Book } from "@/types/api";
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: "Pendiente",
-  en_lectura: "En lectura",
-  leido: "Leído",
+  pending: "Pendiente",
+  in_progress: "En lectura",
+  read: "Leído",
 };
 
 export default function BookDetailScreen() {
@@ -37,7 +37,7 @@ export default function BookDetailScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user, refreshUser } = useAuth();
-  const [book, setBook] = useState<Libro | null>(null);
+  const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [pagesInput, setPagesInput] = useState("");
   const [updatingPages, setUpdatingPages] = useState(false);
@@ -64,7 +64,7 @@ export default function BookDetailScreen() {
     try {
       const b = await getBook(token, libroId);
       setBook(b);
-      setPagesInput(String(b.paginasLeidas ?? 0));
+      setPagesInput(String(b.pagesRead ?? 0));
     } catch (e) {
       const msg =
         (e instanceof ApiError ? e.message : null) ||
@@ -94,21 +94,21 @@ export default function BookDetailScreen() {
     }
     setUpdatingPages(true);
     try {
-      const updated = await updateBookPages(token, book.libroId, {
+      const updated = await updateBookPages(token, book.bookId, {
         pagesRead: num,
       });
       setBook((prev) => {
-        if (!prev) return updated;
+        if (!prev) return updated.book;
         return {
           ...prev,
-          ...updated,
-          titulo: updated.titulo || prev.titulo,
-          autor: updated.autor ?? prev.autor,
-          imagenUrl: updated.imagenUrl ?? prev.imagenUrl,
-          descripcion: updated.descripcion ?? prev.descripcion,
-          paginasTotales: updated.paginasTotales ?? prev.paginasTotales,
-          isbn: updated.isbn ?? prev.isbn,
-          genero: updated.genero ?? prev.genero,
+          ...updated.book,
+          title: updated.book.title || prev.title,
+          author: updated.book.author ?? prev.author,
+          imageUrl: updated.book.imageUrl ?? prev.imageUrl,
+          description: updated.book.description ?? prev.description,
+          totalPages: updated.book.totalPages ?? prev.totalPages,
+          isbn: updated.book.isbn ?? prev.isbn,
+          genre: updated.book.genre ?? prev.genre,
         };
       });
       await refreshUser();
@@ -135,7 +135,7 @@ export default function BookDetailScreen() {
     if (!token || !book) return;
     Alert.alert(
       "Eliminar libro",
-      `¿Eliminar "${book.titulo}" de tu biblioteca?`,
+      `¿Eliminar "${book.title}" de tu biblioteca?`,
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -143,7 +143,7 @@ export default function BookDetailScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteBook(token, book.libroId);
+              await deleteBook(token, book.bookId);
               router.replace("/(tabs)");
             } catch (e) {
               const msg =
@@ -171,11 +171,11 @@ export default function BookDetailScreen() {
     );
   }
 
-  const totalPages = book.paginasTotales ?? 0;
-  const readPages = book.paginasLeidas ?? 0;
+  const totalPages = book.totalPages ?? 0;
+  const readPages = book.pagesRead ?? 0;
   const progress = totalPages > 0 ? Math.min(1, readPages / totalPages) : 0;
   const statusLabel =
-    ESTADO_LABEL[book.estadoLectura] ?? book.estadoLectura ?? "";
+    ESTADO_LABEL[book.readingStatus] ?? book.readingStatus ?? "";
   const hasPagesRegistered = totalPages > 0;
 
   const xp = user?.xpPoints ?? 0;
@@ -269,9 +269,9 @@ export default function BookDetailScreen() {
         {/* Portada y datos principales */}
         <View style={styles.hero}>
           <View style={styles.coverWrap}>
-            {book.imagenUrl ? (
+            {book.imageUrl ? (
               <Image
-                source={{ uri: book.imagenUrl }}
+                source={{ uri: book.imageUrl }}
                 style={styles.cover}
                 resizeMode="cover"
               />
@@ -281,8 +281,8 @@ export default function BookDetailScreen() {
               </View>
             )}
           </View>
-          <Text style={styles.title}>{book.titulo}</Text>
-          {book.autor ? <Text style={styles.author}>{book.autor}</Text> : null}
+          <Text style={styles.title}>{book.title}</Text>
+          {book.author ? <Text style={styles.author}>{book.author}</Text> : null}
           {statusLabel ? (
             <View style={styles.statusChip}>
               <Text style={styles.statusChipText}>{statusLabel}</Text>
@@ -398,10 +398,10 @@ export default function BookDetailScreen() {
         )}
 
         {/* Descripción */}
-        {book.descripcion ? (
+        {book.description ? (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Descripción</Text>
-            <Text style={styles.description}>{book.descripcion}</Text>
+            <Text style={styles.description}>{book.description}</Text>
           </View>
         ) : null}
 

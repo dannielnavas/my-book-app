@@ -1,82 +1,12 @@
 import type {
-  ActualizarPaginasDto,
+  UpdatePagesDto,
   CreateBookDto,
-  Libro,
+  Book,
   ResultadoBusqueda,
   UpdateBookDto,
 } from "@/types/api";
 import { api, ApiError } from "./api";
 import { env } from "./env";
-
-/** Normaliza un libro devuelto por la API (puede venir en español o camelCase) */
-function normalizeLibro(raw: Record<string, unknown>): Libro {
-  return {
-    libroId: Number(raw.bookId ?? raw.id ?? 0),
-    titulo: String(raw.titulo ?? raw.title ?? ""),
-    autor:
-      raw.autor != null
-        ? String(raw.autor)
-        : raw.author != null
-          ? String(raw.author)
-          : null,
-    isbn: raw.isbn != null ? String(raw.isbn) : null,
-    descripcion:
-      raw.descripcion != null
-        ? String(raw.descripcion)
-        : raw.description != null
-          ? String(raw.description)
-          : null,
-    imagenUrl:
-      raw.imagenUrl != null
-        ? String(raw.imagenUrl)
-        : raw.imageUrl != null
-          ? String(raw.imageUrl)
-          : null,
-    genero:
-      raw.genero != null
-        ? String(raw.genero)
-        : raw.genre != null
-          ? String(raw.genre)
-          : null,
-    paginasTotales:
-      raw.paginasTotales != null
-        ? Number(raw.paginasTotales)
-        : raw.totalPages != null
-          ? Number(raw.totalPages)
-          : null,
-    paginasLeidas:
-      raw.paginasLeidas != null
-        ? Number(raw.paginasLeidas)
-        : raw.pagesRead != null
-          ? Number(raw.pagesRead)
-          : null,
-    estadoLectura: String(
-      raw.estadoLectura ?? raw.readingStatus ?? "pendiente",
-    ) as Libro["estadoLectura"],
-    esAdquirido: Boolean(raw.esAdquirido ?? raw.isOwned ?? true),
-    estaPrestado:
-      raw.estaPrestado != null
-        ? Boolean(raw.estaPrestado)
-        : raw.isBorrowed != null
-          ? Boolean(raw.isBorrowed)
-          : undefined,
-    prestadoA:
-      raw.prestadoA != null
-        ? String(raw.prestadoA)
-        : raw.borrowedToName != null
-          ? String(raw.borrowedToName)
-          : null,
-    prestadoEn:
-      raw.prestadoEn != null
-        ? String(raw.prestadoEn)
-        : raw.borrowedAt != null
-          ? String(raw.borrowedAt)
-          : null,
-    createdAt: String(raw.createdAt ?? ""),
-    updatedAt: String(raw.updatedAt ?? ""),
-    usuarioId: Number(raw.usuarioId ?? raw.userId ?? 0),
-  };
-}
 
 function buildApiUrl(path: string): string {
   const base = env.API_URL.replace(/\/$/, "");
@@ -99,13 +29,13 @@ export async function searchBooks(
   return (res as { results?: ResultadoBusqueda[] }).results ?? [];
 }
 
-export async function getBooks(token: string): Promise<Libro[]> {
+export async function getBooks(token: string): Promise<Book[]> {
   const raw = await api<unknown>("/books", { token });
   const arr = Array.isArray(raw) ? raw : [];
-  return arr.map((item) => normalizeLibro(item as Record<string, unknown>));
+  return arr as Book[];
 }
 
-export async function getBook(token: string, libroId: number): Promise<Libro> {
+export async function getBook(token: string, libroId: number): Promise<Book> {
   const res = await api<Record<string, unknown>>(`/books/${libroId}`, {
     token,
   });
@@ -116,52 +46,51 @@ export async function getBook(token: string, libroId: number): Promise<Libro> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new ApiError(404, "Libro no encontrado");
   }
-  try {
-    return normalizeLibro(raw);
-  } catch (err) {
-    const msg =
-      err instanceof Error ? err.message : "Datos del libro no válidos";
-    throw new ApiError(500, msg);
-  }
+  return raw as unknown as Book;
 }
 
 export async function createBook(
   token: string,
   body: CreateBookDto,
-): Promise<Libro> {
+): Promise<Book> {
   console.log("body", body);
   const raw = await api<Record<string, unknown>>("/books", {
     method: "POST",
     token,
     body,
   });
-  return normalizeLibro(raw);
+  return raw as unknown as Book;
 }
 
 export async function updateBook(
   token: string,
   libroId: number,
   body: UpdateBookDto,
-): Promise<Libro> {
+): Promise<Book> {
   const raw = await api<Record<string, unknown>>(`/books/${libroId}`, {
     method: "PATCH",
     token,
     body,
   });
-  return normalizeLibro(raw);
+  return raw as unknown as Book;
 }
 
 export async function updateBookPages(
   token: string,
   libroId: number,
-  body: ActualizarPaginasDto,
-): Promise<Libro> {
-  const raw = await api<Record<string, unknown>>(`/books/${libroId}/pages`, {
+  body: UpdatePagesDto,
+): Promise<{ book: Book; xpEarned: number; levelUp: boolean; newLevel: number }> {
+  const raw = await api<{ book: Record<string, unknown>; xpEarned: number; levelUp: boolean; newLevel: number }>(`/books/${libroId}/pages`, {
     method: "PATCH",
     token,
     body,
   });
-  return normalizeLibro(raw);
+  return {
+    book: raw.book as unknown as Book,
+    xpEarned: raw.xpEarned,
+    levelUp: raw.levelUp,
+    newLevel: raw.newLevel,
+  };
 }
 
 export async function deleteBook(
@@ -188,7 +117,7 @@ export async function uploadBookCover(
   fileUri: string,
   fileName?: string,
   mimeType?: string,
-): Promise<{ imageUrl: string; book: Libro | null }> {
+): Promise<{ imageUrl: string; book: Book | null }> {
   const url = buildApiUrl(`/books/${libroId}/cover`);
 
   const form = new FormData();
@@ -240,7 +169,7 @@ export async function uploadBookCover(
     throw new ApiError(500, "Respuesta inválida al subir la portada");
   }
 
-  const book = rawBook ? normalizeLibro(rawBook) : null;
+  const book = rawBook ? (rawBook as unknown as Book) : null;
   return { imageUrl: rawImageUrl, book };
 }
 

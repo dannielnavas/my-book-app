@@ -2,7 +2,7 @@
  * Tipos alineados con la API del backend (nombres en español donde aplica).
  */
 
-export type EstadoLectura = "pendiente" | "en_lectura" | "leido";
+export type ReadingStatus = "pending" | "in_progress" | "read";
 
 export interface Usuario {
   id: number;
@@ -15,24 +15,23 @@ export interface Usuario {
   planId?: number | null;
 }
 
-export interface Libro {
-  libroId: number;
-  titulo: string;
-  autor?: string | null;
-  isbn?: string | null;
-  descripcion?: string | null;
-  imagenUrl?: string | null;
-  genero?: string | null;
-  paginasTotales?: number | null;
-  paginasLeidas?: number | null;
-  estadoLectura: EstadoLectura;
-  esAdquirido: boolean;
-  estaPrestado?: boolean;
-  prestadoA?: string | null;
-  prestadoEn?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  usuarioId: number;
+export interface Book {
+  bookId: number;
+  userId: number;
+  isbn: string | null;
+  title: string;
+  author: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  genre: string | null;
+  totalPages: number | null;
+  pagesRead: number;
+  isOwned: boolean;
+  readingStatus: ReadingStatus;
+  isBorrowed: boolean;
+  borrowedToName: string | null;
+  borrowedAt: string | null;
+  addedAt: string;
 }
 
 /** Resultado de búsqueda externa (Google Books, Open Library) */
@@ -70,7 +69,7 @@ export interface UpdateBookDto {
   genre?: string;
   totalPages?: number;
   pagesRead?: number;
-  readingStatus?: EstadoLectura;
+  readingStatus?: ReadingStatus;
   isOwned?: boolean;
   isBorrowed?: boolean;
   borrowedToName?: string;
@@ -78,7 +77,7 @@ export interface UpdateBookDto {
 }
 
 /** Body para PATCH /api/books/:id/paginas */
-export interface ActualizarPaginasDto {
+export interface UpdatePagesDto {
   pagesRead: number;
 }
 
