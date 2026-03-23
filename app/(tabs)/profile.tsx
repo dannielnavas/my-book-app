@@ -18,6 +18,7 @@ import { getLevelProgress } from "@/constants/gamification";
 import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
+import { getEntitlements } from "@/lib/plans";
 import { getMe } from "@/lib/users-api";
 import type { Usuario } from "@/types/api";
 
@@ -84,6 +85,7 @@ export default function ProfileScreen() {
   const level = user?.level ?? 1;
   const streak = user?.readingStreakDays ?? 0;
   const levelProgress = getLevelProgress(xp);
+  const { isPaid } = getEntitlements(user);
 
   if (loading) {
     return (
@@ -142,19 +144,21 @@ export default function ProfileScreen() {
             />
             <Text style={styles.btnSecondaryLabel}>Escanear libro</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={handleAiHub}
-            activeOpacity={0.8}
-            disabled={loggingOut}
-          >
-            <Ionicons
-              name="sparkles-outline"
-              size={22}
-              color={colors.surface}
-            />
-            <Text style={styles.btnPrimaryLabel}>Asistente IA</Text>
-          </TouchableOpacity>
+          {isPaid ? (
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              onPress={handleAiHub}
+              activeOpacity={0.8}
+              disabled={loggingOut}
+            >
+              <Ionicons
+                name="sparkles-outline"
+                size={22}
+                color={colors.surface}
+              />
+              <Text style={styles.btnPrimaryLabel}>Asistente IA</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
