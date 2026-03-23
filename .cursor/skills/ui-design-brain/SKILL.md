@@ -1,44 +1,53 @@
 ---
 name: ui-design-brain
-description: Generates production-grade web UI using documented component patterns and design-system conventions (not generic AI layouts). Use when building or designing web pages, dashboards, forms, navigation, modals, or any React/HTML/Tailwind UI; references 60 components with best practices from component.gallery–style guidance.
+description: Generates modern minimalist, sell-ready UI for Angular, Astro, or React Native (Expo) using documented component patterns and design-system conventions—not generic AI layouts. Use when building interfaces, screens, marketing pages, dashboards, or native apps that must look polished enough to ship, demo, or sell; references 60 components in components.md.
 ---
 
 # UI Design Brain
 
-Curated guidance for **60 UI component patterns** with best practices, layout rules, and aliases. **Before writing UI code**, consult this skill and read [components.md](components.md) for the full reference.
+Curated guidance for **60 UI component patterns** (see [components.md](components.md)) plus **stack-specific rules** for **Angular**, **Astro**, and **React Native + Expo**. **Before writing UI code**, consult this skill and the component reference.
 
 ## When to Use
 
-Apply when the user asks to build, design, or generate:
+Apply when designing or implementing:
 
-- Web pages, landing pages, marketing sites
-- SaaS dashboards, admin panels, settings
-- Forms, tables, navigation
-- Modals, drawers, popovers, overlays
-- Any React, HTML/CSS, or Tailwind UI
+- **Web:** Angular apps, Astro sites (landing, docs, marketing), dashboards, forms, navigation, overlays
+- **Native:** Expo / React Native screens, tabs, stacks, modals, lists, settings
+- Any work where the UI must feel **minimal, modern, and ready to sell or present** (investor demos, App Store screenshots, client handoff)
 
-## Design Philosophy
+## Sell-ready & presentation quality
 
-Interfaces should feel **modern, minimal, and production-ready** — not templated.
+Interfaces should look like **shipping software**, not prototypes.
+
+- **Visual polish:** consistent radii, borders, and shadows (or flat borders only—pick one system); no mixed elevation styles on one screen
+- **Confidence:** one clear primary action per section; no competing CTAs
+- **Screenshots & demos:** legible type at a glance; enough contrast for recording and projectors; avoid tiny labels on hero cards
+- **Trust:** aligned baselines, even spacing, no “almost aligned” rows
+- **Empty & edge cases:** every list and async view gets empty, loading, and error—never a blank screen
+- **Motion:** subtle only (150–300 ms); native/Web consistent with platform expectations—no gratuitous animation
+
+## Design philosophy
+
+**Modern minimal** — calm, intentional, product-grade—not decorative.
 
 ### Core principles
 
-1. **Restraint over decoration** — fewer elements, refined; white space is a feature.
-2. **Typography carries hierarchy** — pair a distinctive display font with a clean body font; strong weight contrast between headings and labels.
-3. **One strong color moment** — neutrals first (warm off-whites, near-blacks, muted mid-tones); one confident accent.
-4. **Spacing is structure** — 8 px grid; tighter gaps group related content; generous gaps for hero sections.
-5. **Accessibility** — WCAG AA contrast, visible focus, semantic HTML, keyboard navigation.
-6. **No generic AI aesthetics** — avoid purple-on-white gradients, Inter/Roboto defaults, evenly-spaced card grids, cookie-cutter layouts.
+1. **Restraint over decoration** — fewer elements, refined; white space (or native breathing room) is a feature
+2. **Typography carries hierarchy** — distinctive display + clean body on web; on native, use platform-appropriate scale tokens and weight contrast
+3. **One strong color moment** — neutrals first; one confident accent for actions and key states
+4. **Spacing is structure** — 8 px grid on web; on native, map to a small fixed scale (4/8/12/16/24) via theme or StyleSheet tokens
+5. **Accessibility** — WCAG-style contrast on web; sufficient touch targets and labels on native (`accessibilityLabel`, `accessibilityRole`)
+6. **No generic AI aesthetics** — no purple gradients, no default Inter/Roboto as the only personality, no uniform card grids with no hierarchy
 
 ### Quality bar
 
-Aim for senior product designer / top SaaS bar: visual rhythm with intentional asymmetry; clear hover/focus/active; empty/loading/error states; responsive without breakpoint artifacts.
+Senior product designer / premium SaaS or App Store–quality: clear hierarchy, obvious affordances, polished states, responsive or adaptive layouts without awkward breakpoints.
 
 ## Workflow
 
 ### Step 1 — Identify components
 
-Map the request to components. Use [components.md](components.md) by name or alias.
+Map the request to patterns in [components.md](components.md) by name or alias.
 
 | User intent | Components |
 |-------------|------------|
@@ -51,98 +60,126 @@ Map the request to components. Use [components.md](components.md) by name or ali
 
 ### Step 2 — Apply best practices
 
-Per component, follow [components.md](components.md). Broad rules:
+Follow [components.md](components.md) per component. Broad rules:
 
 **Layout**
 
-- Single-column forms for scan speed.
-- Consistent vertical lanes in lists/tables.
-- Fixed-width slots for icons/actions (even when empty).
-- Cards: media → title → meta → action.
+- Single-column forms where possible; consistent vertical lanes in lists/tables
+- Fixed-width slots for icons/actions (even when empty)
+- Cards: media → title → meta → action
 
 **Interaction**
 
-- Buttons: verb-first labels ("Save changes"); one primary per section.
-- Modals: X, Cancel, Escape; trap focus; restore focus on close.
-- Toasts: 4–6 s auto-dismiss; manual dismiss; stack newest on top.
-- Toggles: immediate effect; checkboxes in forms that require Save.
+- Buttons: verb-first labels; one primary per section
+- Modals: close affordance + cancel path + Escape (web) / predictable back dismiss (native)
+- Toasts/snackbars: short copy; stack consistently
+- Toggles: immediate effect; checkboxes when a Save action applies
 
 **Typography & spacing**
 
-- Strict heading hierarchy (h1 → h2 → h3); one h1 per page.
-- ≥44 px touch targets on mobile.
-- Labels above inputs (vertical) or beside (horizontal).
-- Placeholder = format hint only, never replaces label.
+- One main title per screen (web: one `h1` per route where applicable)
+- Touch targets ≥44 pt on native; ≥44 px on touch web
+- Labels visible; placeholder ≠ label
 
 **States**
 
-- Empty: illustration + headline + primary CTA.
-- Loading: skeleton > spinner; show spinner after ~300 ms delay.
-- Validation: inline on blur, not every keystroke.
-- Disabled: distinct but readable.
+- Empty: illustration or icon + headline + primary CTA
+- Loading: skeleton when layout is known; spinner after ~300 ms if not
+- Validation: inline on blur (web); clear errors before submit (native)
 
 ### Step 3 — Design direction
 
-Pick a preset or ask if unclear:
-
 | Preset | Notes |
 |--------|--------|
-| **Modern SaaS** (default) | Neutral + one accent; 8 px grid; spacious |
-| **Apple-level minimal** | Near-monochrome warm grays; large type; 150–250 ms ease-out micro-interactions |
-| **Enterprise** | Dense; 4/8/12/16/24 px scale; keyboard-first forms |
-| **Creative / portfolio** | Bold type, asymmetric layout, editorial feel |
-| **Data dashboard** | Scannable rows; KPI → trend → detail |
+| **Modern SaaS** (default) | Neutral + one accent; spacious; minimal chrome |
+| **Apple-level minimal** | Near-monochrome warm grays; large type; soft motion |
+| **Enterprise** | Dense but orderly; keyboard-first web; clear data tables |
+| **Creative / portfolio** | Expressive type and layout; still minimal ornament |
+| **Data dashboard** | KPI → trend → detail; scannable tables |
 
-### Step 4 — Generate code
+### Step 4 — Match the stack
 
-Default stack unless the user specifies otherwise:
+Detect from the project or user: **Angular**, **Astro**, or **Expo (React Native)**. Apply the matching rules; default styling approach should stay **minimal and token-driven** (CSS variables, theme objects, or design tokens)—not one-off hex everywhere.
+
+#### Angular
+
+- Prefer **standalone components** and idiomatic template syntax; keep templates readable and shallow
+- Style with **component styles** + global tokens (CSS variables or Tailwind if the project uses it); avoid inline style sprawl
+- Use **Angular Material** or the project’s UI kit consistently—don’t mix three button styles
+- **a11y:** native button/link elements, `aria-*` where Material doesn’t cover it, focus management for dialogs
+- Routing: lazy-loaded feature UI should still use the same spacing/type scale as shell layout
+
+#### Astro
+
+- Prefer **content-first pages**: minimal client JS; islands only where interactivity is needed
+- **Scoped CSS** or Tailwind consistent with the rest of the site; reuse layout shells for marketing vs app sections
+- SEO and performance are part of “sell-ready”: meaningful headings, `alt` text, fast LCP
+- Clear visual hierarchy above the fold for landing and pricing pages
+
+#### React Native (Expo)
+
+- Use **Expo Router** patterns if present (tabs, stacks, modals); align headers with screen purpose—minimal titles, clear back
+- **Safe areas:** respect notches and home indicators (`SafeAreaView` / `react-native-safe-area-context`)
+- **Navigation:** native stack/modal transitions; avoid web-only patterns (hover); use **Pressable** with pressed opacity or scale for feedback
+- Lists: `FlatList` / `SectionList` with stable keys; empty `ListEmptyComponent`; pull-to-refresh when data is remote
+- **Haptics:** light impact for success actions if the app already uses `expo-haptics`—optional, not gimmicky
+- Icons: one family (e.g. `@expo/vector-icons` or Lucide) for consistency
+- Prefer **StyleSheet** or the project’s solution (NativeWind, Tamagui, etc.)—match existing patterns
+
+#### Web shared (Angular & Astro)
 
 | Concern | Rule |
 |---------|------|
-| Stack | React + Tailwind CSS |
-| Spacing | Tailwind on 8 px grid (`p-2`, `gap-4`, …) |
-| Colors | CSS variables or Tailwind theme tokens |
-| Typography | Utilities + expressive pairings (e.g. Google Fonts) |
-| States | hover, focus, active, disabled on interactives |
-| Responsive | Mobile-first; check ~375, 768, 1440 |
-| A11y | Semantic HTML; ARIA when needed; focus management |
+| Spacing | 8 px grid; utilities or tokens |
+| Color | CSS variables or theme; one accent |
+| Typography | Defined scale; webfonts loaded with restraint |
+| States | `:hover`, `:focus-visible`, `:active`, `disabled` |
+| Responsive | Mobile-first; check ~375, 768, 1280+ |
+
+#### Native shared (Expo)
+
+| Concern | Rule |
+|---------|------|
+| Spacing | Consistent scale in theme/StyleSheet |
+| Color | Light/dark if app supports both; test contrast |
+| Typography | `Text` variants; limit font families |
+| States | pressed, disabled, loading on buttons and rows |
+| Platform | Test iOS + Android; respect platform nav patterns |
 
 ## Component quick reference
 
-The 15 most common patterns; full 60-component list in [components.md](components.md).
+Full list in [components.md](components.md).
 
 | Component | Use | Key rule |
 |-----------|-----|----------|
 | Button | Actions | Verb-first; one primary per section |
 | Card | Entity | Media → title → meta → action; shadow **or** border |
-| Modal | Focus | Focus trap; X + Cancel + Escape |
-| Navigation | Links | 5–7 items; clear active state |
-| Table | Data | Sticky header; numbers right-aligned |
-| Tabs | Panels | 2–7 tabs; indicator; accordion on small screens |
-| Form | Input | Single column; labels; blur validation |
-| Toast | Short feedback | 4–6 s; undo for destructive |
-| Alert | Status | Semantic color + icon; ≤2 sentences |
-| Drawer | Secondary panel | Right detail / left nav; 320–480 px desktop |
-| Search input | Find | Cmd/Ctrl+K; debounce 200–300 ms |
-| Empty state | No data | Illustration + headline + CTA |
-| Skeleton | Loading | Match layout; shimmer |
-| Badge | Status | 1–2 words; limited palette |
-| Dropdown menu | Actions | 7±2 items; destructive last, red |
+| Modal | Focus | Dismiss + focus sanity (web); fullScreen vs sheet on native when appropriate |
+| Navigation | Links / routes | Limited items; clear active state |
+| Table | Data | Sticky header (web); readable rows on native (cards or table) |
+| Tabs | Panels | Clear selected state; avoid tab overload |
+| Form | Input | Single column; labels; validation |
+| Toast | Short feedback | Brief; consistent placement |
+| Alert | Status | Semantic color + icon; short copy |
+| Drawer | Secondary panel | Web sheet/drawer; native can use slide-over or screen |
+| Search input | Find | Debounced; clear affordance |
+| Empty state | No data | Positive copy + CTA |
+| Skeleton | Loading | Match final layout |
+| Badge | Status | 1–2 words; semantic colors |
+| Dropdown menu | Actions | Destructive last |
 
 ## Anti-patterns
 
 Avoid:
 
 - Rainbow badges with no semantics
-- Modal inside modal (use page or drawer)
-- Disabled submit with no explanation
+- Nested modals for long flows (use page or drawer / new screen)
+- Disabled primary with no explanation
 - Spinner for predictable layouts (use skeleton)
-- "Click here" links
-- Hamburger on desktop when space allows visible nav
-- Auto-advancing carousels
-- Placeholder-only fields (always visible labels)
-- Equal-weight buttons (establish hierarchy)
-- Body text below 14 px (prefer 16 px)
+- Vague links (“click here”)
+- Placeholder-only fields
+- Equal-weight buttons
+- Body text smaller than ~14 px on web; illegible captions on native
 
 ## Additional resources
 

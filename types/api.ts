@@ -88,6 +88,45 @@ export interface CrearRecomendacionDto {
   aiModel: string;
 }
 
+/** POST /api/ai/books/recommendations */
+export interface AiBooksRecommendationsBody {
+  preferences?: string;
+  genres?: string[];
+  limit?: number;
+}
+
+/** POST /api/ai/books/summary */
+export interface AiBooksSummaryBody {
+  title: string;
+  author?: string;
+  description?: string;
+}
+
+/** POST /api/ai/books/similar */
+export interface AiBooksSimilarBody {
+  title: string;
+  author?: string;
+  limit?: number;
+}
+
+/** POST /api/ai/books/reading-plan */
+export interface AiBooksReadingPlanBody {
+  bookId?: number;
+  title?: string;
+  author?: string;
+  totalPages?: number;
+  pagesRead?: number;
+  targetPerDay?: number;
+  constraints?: string;
+}
+
+/** POST /api/ai/books/ask */
+export interface AiBooksAskBody {
+  bookId?: number;
+  question: string;
+  context?: string;
+}
+
 export interface AuthLoginResponse {
   usuario: Usuario;
   accessToken: string;

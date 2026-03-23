@@ -2,6 +2,8 @@
 
 Complete reference for 60 UI components with best practices, common layouts, and aliases. Sourced from [component.gallery](https://component.gallery) and enriched with production-grade guidance.
 
+**Stacks:** Wording targets web patterns (HTML/CSS, Angular, Astro). For **React Native (Expo)**, map the same intent to native primitives (e.g. `Modal`, `Pressable`, `FlatList`, `TextInput`, `Switch`, safe areas)—keep the **best practices** (hierarchy, spacing, states, accessibility) identical even when the implementation differs.
+
 ---
 
 ## Contents

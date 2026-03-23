@@ -73,7 +73,7 @@ export default function ProfileScreen() {
   };
 
   const handleEditProfile = () => router.push("/profile-edit");
-  const handleRecommendations = () => router.push("/recommendations");
+  const handleAiHub = () => router.push("/ai-hub");
   const handleScan = () => router.push("/scan");
 
   const { width } = useWindowDimensions();
@@ -144,7 +144,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.btnPrimary}
-            onPress={handleRecommendations}
+            onPress={handleAiHub}
             activeOpacity={0.8}
             disabled={loggingOut}
           >
@@ -153,7 +153,7 @@ export default function ProfileScreen() {
               size={22}
               color={colors.surface}
             />
-            <Text style={styles.btnPrimaryLabel}>Recomendaciones IA</Text>
+            <Text style={styles.btnPrimaryLabel}>Asistente IA</Text>
           </TouchableOpacity>
         </View>
       </View>

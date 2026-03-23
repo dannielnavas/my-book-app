@@ -37,7 +37,12 @@ function RootNavigator() {
         <Stack.Screen name="search" />
         <Stack.Screen name="add-book" options={{ presentation: 'card' }} />
         <Stack.Screen name="profile-edit" options={{ title: 'Editar perfil' }} />
-        <Stack.Screen name="recommendations" options={{ title: 'Recomendaciones IA' }} />
+        <Stack.Screen name="ai-hub" options={{ title: 'Asistente IA' }} />
+        <Stack.Screen name="recommendations" options={{ title: 'Recomendaciones' }} />
+        <Stack.Screen name="ai-summary" options={{ title: 'Resumen y temas' }} />
+        <Stack.Screen name="ai-similar" options={{ title: 'Libros parecidos' }} />
+        <Stack.Screen name="ai-reading-plan" options={{ title: 'Plan de lectura' }} />
+        <Stack.Screen name="ai-ask" options={{ title: 'Preguntar al libro' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
 import { AiResponseView } from "@/components/AiResponseView";
@@ -20,17 +20,17 @@ import type { AppColorsPalette } from "@/constants/colors";
 import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
 import { useAppColors } from "@/hooks/use-app-colors";
-import { postAiBooksRecommendations } from "@/lib/ai-api";
 import { ApiError } from "@/lib/api";
+import { postAiBooksSummary } from "@/lib/ai-api";
 
-export default function RecommendationsScreen() {
+export default function AiSummaryScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { token } = useAuth();
   const { alert: appAlert } = useAppDialog();
-  const [genresLine, setGenresLine] = useState("");
-  const [preferences, setPreferences] = useState("");
-  const [notes, setNotes] = useState("");
+  const [title, setTitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<unknown>(null);
   const insets = useSafeAreaInsets();
@@ -38,27 +38,29 @@ export default function RecommendationsScreen() {
   const contentWidth = Math.min(width - 32, 400);
 
   const run = async () => {
+    const t = title.trim();
     if (!token) return;
+    if (!t) {
+      appAlert(
+        "Falta el título",
+        "Escribe al menos el título del libro.",
+        undefined,
+        { tone: "warning" },
+      );
+      return;
+    }
     setLoading(true);
     setResult(null);
     try {
-      const genres = genresLine
-        .split(/[,;]/)
-        .map((g) => g.trim())
-        .filter(Boolean);
-      const body = {
-        ...(preferences.trim() ? { preferences: preferences.trim() } : {}),
-        ...(genres.length ? { genres } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-      };
-      const data = await postAiBooksRecommendations(
-        token,
-        Object.keys(body).length ? body : undefined,
-      );
+      const data = await postAiBooksSummary(token, {
+        title: t,
+        ...(author.trim() ? { author: author.trim() } : {}),
+        ...(description.trim() ? { description: description.trim() } : {}),
+      });
       setResult(data);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Error al generar";
-      appAlert("No pudimos obtener recomendaciones", msg, undefined, {
+      appAlert("No pudimos generar el resumen", msg, undefined, {
         tone: "error",
       });
     } finally {
@@ -82,39 +84,36 @@ export default function RecommendationsScreen() {
       >
         <View style={{ width: contentWidth }}>
           <AiToolHeader
-            title="Recomendaciones"
-            subtitle="La IA usa tu biblioteca y, si quieres, preferencias y géneros. Consume cuota solo si la respuesta llega bien."
+            title="Resumen y temas"
+            subtitle="Ideal cuando aún no tienes el libro en la app: pega o escribe metadatos y obtén un resumen breve y temas."
           />
 
-          <Text style={styles.label}>Preferencias (opcional)</Text>
-          <TextInput
-            style={styles.input}
-            value={preferences}
-            onChangeText={setPreferences}
-            placeholder="Ej.: Novelas cortas, poco violencia, autores latinoamericanos"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            editable={!loading}
-          />
-
-          <Text style={styles.label}>
-            Géneros (opcional, separados por coma)
-          </Text>
+          <Text style={styles.label}>Título</Text>
           <TextInput
             style={styles.inputSingle}
-            value={genresLine}
-            onChangeText={setGenresLine}
-            placeholder="Ej.: fantasía, ensayo, thriller"
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Título del libro"
             placeholderTextColor={colors.textSecondary}
             editable={!loading}
           />
 
-          <Text style={styles.label}>Notas adicionales (opcional)</Text>
+          <Text style={styles.label}>Autor (opcional)</Text>
+          <TextInput
+            style={styles.inputSingle}
+            value={author}
+            onChangeText={setAuthor}
+            placeholder="Autor o autores"
+            placeholderTextColor={colors.textSecondary}
+            editable={!loading}
+          />
+
+          <Text style={styles.label}>Descripción o sinopsis (opcional)</Text>
           <TextInput
             style={styles.input}
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Cualquier contexto que quieras añadir"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Contraportada, notas o lo que tengas"
             placeholderTextColor={colors.textSecondary}
             multiline
             editable={!loading}
@@ -125,12 +124,11 @@ export default function RecommendationsScreen() {
             onPress={run}
             disabled={loading}
             accessibilityRole="button"
-            accessibilityLabel="Generar recomendaciones"
           >
             {loading ? (
               <ActivityIndicator color={colors.surface} />
             ) : (
-              <Text style={styles.buttonText}>Generar recomendaciones</Text>
+              <Text style={styles.buttonText}>Generar resumen</Text>
             )}
           </TouchableOpacity>
 
@@ -139,14 +137,7 @@ export default function RecommendationsScreen() {
               <Text style={styles.resultHeading}>Resultado</Text>
               <AiResponseView data={result} />
             </View>
-          ) : (
-            <View style={styles.hintBox}>
-              <Text style={styles.hintText}>
-                Si no escribes nada, nuestro sistema puede inferir solo con tu
-                biblioteca y perfil.
-              </Text>
-            </View>
-          )}
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -178,7 +169,7 @@ function createStyles(colors: AppColorsPalette) {
       paddingVertical: 12,
       fontSize: 16,
       color: colors.text,
-      minHeight: 88,
+      minHeight: 120,
       textAlignVertical: "top",
       marginBottom: 16,
     },
@@ -200,17 +191,13 @@ function createStyles(colors: AppColorsPalette) {
       alignItems: "center",
       marginTop: 4,
     },
-    buttonDisabled: {
-      opacity: 0.75,
-    },
+    buttonDisabled: { opacity: 0.75 },
     buttonText: {
       color: colors.surface,
       fontSize: 16,
       fontWeight: "600",
     },
-    resultBlock: {
-      marginTop: 28,
-    },
+    resultBlock: { marginTop: 28 },
     resultHeading: {
       fontSize: 14,
       fontWeight: "700",
@@ -218,19 +205,6 @@ function createStyles(colors: AppColorsPalette) {
       marginBottom: 12,
       textTransform: "uppercase",
       letterSpacing: 0.5,
-    },
-    hintBox: {
-      marginTop: 24,
-      padding: 16,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    hintText: {
-      fontSize: 14,
-      lineHeight: 20,
-      color: colors.textSecondary,
     },
   });
 }
